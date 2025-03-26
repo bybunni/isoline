@@ -177,13 +177,13 @@ class IsolineGame(pyglet.window.Window):
         move_y = 0
 
         if self.keys[key.W] or self.keys[key.UP]:
-            move_y += 1
+            move_y -= 1  # Inverted: Camera moves up, view moves down
         if self.keys[key.S] or self.keys[key.DOWN]:
-            move_y -= 1
+            move_y += 1  # Inverted: Camera moves down, view moves up
         if self.keys[key.A] or self.keys[key.LEFT]:
-            move_x -= 1
+            move_x += 1  # Inverted: Camera moves left, view moves right
         if self.keys[key.D] or self.keys[key.RIGHT]:
-            move_x += 1
+            move_x -= 1  # Inverted: Camera moves right, view moves left
 
         # Apply movement
         self.camera_x += move_x * self.camera_speed * dt
