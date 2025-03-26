@@ -32,6 +32,14 @@ class VectorRenderer:
         self.lines = []
         self.glow_lines = []
         self.time = 0
+        
+        # Register tile renderers
+        self.tile_renderers = {
+            "G": self._render_grass,
+            "M": self._render_mountain,
+            "W": self._render_water,
+            "B": self._render_bridge,
+        }
 
     def set_color(self, color):
         """
@@ -143,6 +151,63 @@ class VectorRenderer:
                 if tile_char:
                     self.draw_tile_by_type(x, y, tile_char, mdmap_data, layer)
 
+
+    
+    def _render_grass(self, x, y, group=None):
+        """
+        Render a grass tile with cross lines.
+        
+        Args:
+            x, y: Tile position in map coordinates
+            group: Rendering group
+        """
+        group = group or self.ground_group
+        # Draw some cross lines to indicate grass
+        self.draw_line(x, y, x + 1, y + 1, group)
+        self.draw_line(x + 1, y, x, y + 1, group)
+    
+    def _render_mountain(self, x, y, group=None):
+        """
+        Render a mountain tile with a triangle shape.
+        
+        Args:
+            x, y: Tile position in map coordinates
+            group: Rendering group
+        """
+        group = group or self.ground_group
+        # Draw a triangle shape for mountains
+        self.draw_line(x, y + 0.7, x + 0.5, y + 0.2, group)
+        self.draw_line(x + 0.5, y + 0.2, x + 1, y + 0.7, group)
+        self.draw_line(x + 1, y + 0.7, x, y + 0.7, group)
+    
+    def _render_water(self, x, y, group=None):
+        """
+        Render a water tile with horizontal lines.
+        
+        Args:
+            x, y: Tile position in map coordinates
+            group: Rendering group
+        """
+        group = group or self.ground_group
+        # Draw horizontal lines for water
+        for i in range(1, 4):
+            offset = i * 0.25
+            self.draw_line(x, y + offset, x + 1, y + offset, group)
+    
+    def _render_bridge(self, x, y, group=None):
+        """
+        Render a bridge tile with vertical planks.
+        
+        Args:
+            x, y: Tile position in map coordinates
+            group: Rendering group
+        """
+        group = group or self.ground_group
+        # Draw bridge planks
+        for i in range(1, 4):
+            offset = i * 0.25
+            self.draw_line(x + offset, y, x + offset, y + 1, group)
+            
     def draw_tile_by_type(self, x, y, tile_char, mdmap_data, layer):
         """
         Draw specialized tile visuals based on tile type.
@@ -153,35 +218,18 @@ class VectorRenderer:
             mdmap_data: MDMapParser instance
             layer: Layer name
         """
-        # This method can be extended for different tile types
-        # For now, we'll add some simple patterns based on tile type
-
+        # Get the meaning from the mdmap data (could be used for additional rendering logic)
         meaning = mdmap_data.get_tile_meaning(layer, tile_char)
-
-        # Adjust rendering based on tile type
-        if tile_char == "G":  # Grass
-            # Draw some cross lines to indicate grass
-            self.draw_line(x, y, x + 1, y + 1, self.ground_group)
-            self.draw_line(x + 1, y, x, y + 1, self.ground_group)
-
-        elif tile_char == "M":  # Mountain
-            # Draw a triangle shape for mountains
-            mid_x, mid_y = x + 0.5, y + 0.5
-            self.draw_line(x, y + 0.7, x + 0.5, y + 0.2, self.ground_group)
-            self.draw_line(x + 0.5, y + 0.2, x + 1, y + 0.7, self.ground_group)
-            self.draw_line(x + 1, y + 0.7, x, y + 0.7, self.ground_group)
-
-        elif tile_char == "W":  # Water
-            # Draw horizontal lines for water
-            for i in range(1, 4):
-                offset = i * 0.25
-                self.draw_line(x, y + offset, x + 1, y + offset, self.ground_group)
-
-        elif tile_char == "B":  # Bridge
-            # Draw bridge planks
-            for i in range(1, 4):
-                offset = i * 0.25
-                self.draw_line(x + offset, y, x + offset, y + 1, self.ground_group)
+        
+        # Look up the renderer function from our dictionary
+        renderer = self.tile_renderers.get(tile_char)
+        
+        # If we have a registered renderer for this tile type, use it
+        if renderer:
+            renderer(x, y, self.ground_group)
+        else:
+            # Default behavior for unknown tile types - just draw the outline
+            self.draw_isometric_tile_outline(x, y, self.ground_group)
 
     def update(self, dt):
         """
