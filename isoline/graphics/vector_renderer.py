@@ -168,17 +168,60 @@ class VectorRenderer:
     
     def _render_mountain(self, x, y, group=None):
         """
-        Render a mountain tile with a triangle shape.
+        Render a mountain tile with a proper isometric pyramid.
         
         Args:
             x, y: Tile position in map coordinates
             group: Rendering group
         """
         group = group or self.ground_group
-        # Draw a triangle shape for mountains
-        self.draw_line(x, y + 0.7, x + 0.5, y + 0.2, group)
-        self.draw_line(x + 0.5, y + 0.2, x + 1, y + 0.7, group)
-        self.draw_line(x + 1, y + 0.7, x, y + 0.7, group)
+        
+        # Define pyramid parameters in 3D space
+        w = 0.7  # width of the square base (x-axis)
+        d = 0.7  # depth of the square base (y-axis)
+        h = 0.7  # height of the pyramid (z-axis)
+        
+        # Center offset for the tile
+        center_x, center_y = x + 0.5, y + 0.5
+        
+        # Convert 3D coordinates to 2D isometric view
+        # Formula: X = (x - y) * (√3/2), Y = (x + y) * (1/2) - z
+        sqrt3_2 = 0.866  # √3/2
+        
+        # Define 3D coordinates for base corners
+        base_3d = [
+            (-w/2, -d/2, 0),  # Front-left (A)
+            (w/2, -d/2, 0),   # Front-right (B)
+            (w/2, d/2, 0),    # Back-right (C)
+            (-w/2, d/2, 0)    # Back-left (D)
+        ]
+        
+        # Apex at the center of the base but elevated
+        apex_3d = (0, 0, h)
+        
+        # Project 3D points to 2D isometric view
+        base_iso = [
+            ((x3d - y3d) * sqrt3_2 + center_x, (x3d + y3d) * 0.5 - z3d + center_y)
+            for x3d, y3d, z3d in base_3d
+        ]
+        
+        # Project apex
+        apex_iso = (
+            (apex_3d[0] - apex_3d[1]) * sqrt3_2 + center_x,
+            (apex_3d[0] + apex_3d[1]) * 0.5 - apex_3d[2] + center_y
+        )
+        
+        # Draw the base edges
+        for i in range(4):
+            self.draw_line(
+                base_iso[i][0], base_iso[i][1],
+                base_iso[(i+1)%4][0], base_iso[(i+1)%4][1],
+                group
+            )
+        
+        # Draw lines from each corner to the apex
+        for corner_x, corner_y in base_iso:
+            self.draw_line(corner_x, corner_y, apex_iso[0], apex_iso[1], group)
     
     def _render_water(self, x, y, group=None):
         """
