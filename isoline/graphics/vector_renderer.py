@@ -111,7 +111,7 @@ class VectorRenderer:
         """
         if group is None:
             group = self.ground_group
-
+        
         # Draw the diamond shape of the tile
         self.draw_line(x, y, x + 1, y, group)  # Top-right edge
         self.draw_line(x + 1, y, x + 1, y + 1, group)  # Right-bottom edge
@@ -151,8 +151,6 @@ class VectorRenderer:
                 if tile_char:
                     self.draw_tile_by_type(x, y, tile_char, mdmap_data, layer)
 
-
-    
     def _render_grass(self, x, y, group=None):
         """
         Render a grass tile with cross lines.
@@ -178,29 +176,28 @@ class VectorRenderer:
         
         # Define pyramid parameters in 3D space
         w = 0.7  # width of the square base (x-axis)
-        d = 0.7  # depth of the square base (y-axis)
         h = 0.7  # height of the pyramid (z-axis)
         
         # Center offset for the tile
         center_x, center_y = x + 0.5, y + 0.5
         
         # Convert 3D coordinates to 2D isometric view
-        # Formula: X = (x - y) * (√3/2), Y = (x + y) * (1/2) - z
+        # Formula: X = (x - y) * (√3/2), Y = (x + y) * (1/2) - z  [Note: Adjusted below]
         sqrt3_2 = 0.866  # √3/2
         
-        # Define 3D coordinates for base corners
+        # Define 3D coordinates for base corners (rotated square to form a diamond)
         base_3d = [
-            (-w/2, -d/2, 0),  # Front-left (A)
-            (w/2, -d/2, 0),   # Front-right (B)
-            (w/2, d/2, 0),    # Back-right (C)
-            (-w/2, d/2, 0)    # Back-left (D)
+            (0, -w/2, 0),   # Top vertex
+            (w/2, 0, 0),    # Right vertex
+            (0, w/2, 0),    # Bottom vertex
+            (-w/2, 0, 0)    # Left vertex
         ]
         
         # Apex at the center of the base but elevated
         apex_3d = (0, 0, h)
         
         # Project 3D points to 2D isometric view
-        # Note: Inverted the z-coordinate sign to make the pyramid point up
+        # Note: Inverted the z-coordinate sign previously to point up, now adjusted for proper alignment
         base_iso = [
             ((x3d - y3d) * sqrt3_2 + center_x, (x3d + y3d) * 0.5 + z3d + center_y)
             for x3d, y3d, z3d in base_3d
