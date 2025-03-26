@@ -36,7 +36,7 @@ class VectorRenderer:
         # Register tile renderers
         self.tile_renderers = {
             "G": self._render_grass,
-            "M": self._render_mountain,
+            "M": self._render_cone,
             "W": self._render_water,
             "B": self._render_bridge,
         }
@@ -164,6 +164,42 @@ class VectorRenderer:
         self.draw_line(x, y, x + 1, y + 1, group)
         self.draw_line(x + 1, y, x, y + 1, group)
     
+    def _render_cone(self, x, y, group=None, segments=12):
+        """
+        Render an isometric cone using vector lines.
+        
+        Args:
+            x, y: Tile position in map coordinates
+            group: Rendering group
+            segments: Number of segments to use for the circular base (default: 12)
+        """
+        group = group or self.ground_group
+        
+        # Define cone parameters
+        radius = 0.35  # radius of the circular base
+        height = 0.7   # height of the cone
+        
+        # Center offset for the tile
+        center_x = x + 0.5
+        center_y = y + 0.5
+        
+        # Draw the base circle segments
+        for i in range(segments):
+            angle1 = 2 * math.pi * i / segments
+            angle2 = 2 * math.pi * (i + 1) / segments
+            
+            # Calculate base circle points
+            x1 = center_x + radius * math.cos(angle1)
+            y1 = center_y + radius * math.sin(angle1)
+            x2 = center_x + radius * math.cos(angle2)
+            y2 = center_y + radius * math.sin(angle2)
+            
+            # Draw base circle segment
+            self.draw_line(x1, y1, x2, y2, group)
+            
+            # Draw line from base to apex
+            self.draw_line(x1, y1, center_x, center_y, group)
+
     def _render_mountain(self, x, y, group=None):
         """
         Render a mountain tile with a proper isometric pyramid.
