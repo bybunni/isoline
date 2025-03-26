@@ -1,0 +1,220 @@
+"""
+Vector graphics renderer for isometric tiles.
+"""
+
+import pyglet
+import math
+import random
+from pyglet.graphics import Group
+
+
+class VectorRenderer:
+    """
+    Renders isometric tiles using vector graphics.
+    """
+
+    def __init__(self, projection, batch=None, color=(0, 255, 0, 255)):
+        """
+        Initialize the vector renderer.
+
+        Args:
+            projection: IsometricProjection instance
+            batch: Optional pyglet.graphics.Batch for drawing
+            color: RGBA color tuple for vector lines (default: green)
+        """
+        self.iso_projection = projection
+        self.batch = batch or pyglet.graphics.Batch()
+        self.color = color
+        self.base_color = color
+        self.ground_group = Group(order=0)
+        self.object_group = Group(order=1)
+        self.glow_group = Group(order=2)
+        self.lines = []
+        self.glow_lines = []
+        self.time = 0
+
+    def set_color(self, color):
+        """
+        Set the color for subsequent vector drawing operations.
+
+        Args:
+            color: RGBA color tuple
+        """
+        self.color = color
+
+    def reset_color(self):
+        """Reset color to base color."""
+        self.color = self.base_color
+
+    def draw_line(self, x1, y1, x2, y2, group=None, with_glow=True):
+        """
+        Draw a line in map coordinates.
+
+        Args:
+            x1, y1: Start point in map coordinates
+            x2, y2: End point in map coordinates
+            group: Rendering group (defaults to object_group)
+            with_glow: Whether to add a glow effect
+        """
+        sx1, sy1, sx2, sy2 = self.iso_projection.map_to_screen_vector(x1, y1, x2, y2)
+
+        line = pyglet.shapes.Line(
+            sx1,
+            sy1,
+            sx2,
+            sy2,
+            thickness=1.0,
+            color=self.color[:3],
+            batch=self.batch,
+            group=group or self.object_group,
+        )
+
+        if len(self.color) > 3:
+            line.opacity = self.color[3]
+
+        self.lines.append(line)
+
+        # Add glow effect for CRT look
+        if with_glow and random.random() < 0.2:  # Only some lines glow
+            glow = pyglet.shapes.Line(
+                sx1,
+                sy1,
+                sx2,
+                sy2,
+                thickness=2.0,  # Thicker for glow
+                color=self.color[:3],
+                batch=self.batch,
+                group=self.glow_group,
+            )
+
+            # Reduced opacity for glow
+            glow.opacity = 50 if len(self.color) > 3 else 50
+            self.glow_lines.append(glow)
+
+        return line
+
+    def draw_isometric_tile_outline(self, x, y, group=None):
+        """
+        Draw the outline of an isometric tile.
+
+        Args:
+            x, y: Tile position in map coordinates
+            group: Rendering group (defaults to ground_group)
+        """
+        if group is None:
+            group = self.ground_group
+
+        # Draw the diamond shape of the tile
+        self.draw_line(x, y, x + 1, y, group)  # Top-right edge
+        self.draw_line(x + 1, y, x + 1, y + 1, group)  # Right-bottom edge
+        self.draw_line(x + 1, y + 1, x, y + 1, group)  # Bottom-left edge
+        self.draw_line(x, y + 1, x, y, group)  # Left-top edge
+
+    def draw_grid(self, width, height, group=None):
+        """
+        Draw a grid of isometric tiles.
+
+        Args:
+            width: Grid width in tiles
+            height: Grid height in tiles
+            group: Rendering group (defaults to ground_group)
+        """
+        for y in range(height):
+            for x in range(width):
+                self.draw_isometric_tile_outline(x, y, group)
+
+    def draw_ground_plane(self, mdmap_data, layer="terrain"):
+        """
+        Draw the ground plane based on mdmap data.
+
+        Args:
+            mdmap_data: MDMapParser instance with parsed data
+            layer: Layer name to use for the ground plane
+        """
+        width, height = mdmap_data.size
+
+        # First draw grid for all tiles
+        self.draw_grid(width, height, self.ground_group)
+
+        # Then draw specialized visuals for each tile type
+        for y in range(height):
+            for x in range(width):
+                tile_char = mdmap_data.get_tile(layer, x, y)
+                if tile_char:
+                    self.draw_tile_by_type(x, y, tile_char, mdmap_data, layer)
+
+    def draw_tile_by_type(self, x, y, tile_char, mdmap_data, layer):
+        """
+        Draw specialized tile visuals based on tile type.
+
+        Args:
+            x, y: Tile position in map coordinates
+            tile_char: Character representing the tile type
+            mdmap_data: MDMapParser instance
+            layer: Layer name
+        """
+        # This method can be extended for different tile types
+        # For now, we'll add some simple patterns based on tile type
+
+        meaning = mdmap_data.get_tile_meaning(layer, tile_char)
+
+        # Adjust rendering based on tile type
+        if tile_char == "G":  # Grass
+            # Draw some cross lines to indicate grass
+            self.draw_line(x, y, x + 1, y + 1, self.ground_group)
+            self.draw_line(x + 1, y, x, y + 1, self.ground_group)
+
+        elif tile_char == "M":  # Mountain
+            # Draw a triangle shape for mountains
+            mid_x, mid_y = x + 0.5, y + 0.5
+            self.draw_line(x, y + 0.7, x + 0.5, y + 0.2, self.ground_group)
+            self.draw_line(x + 0.5, y + 0.2, x + 1, y + 0.7, self.ground_group)
+            self.draw_line(x + 1, y + 0.7, x, y + 0.7, self.ground_group)
+
+        elif tile_char == "W":  # Water
+            # Draw horizontal lines for water
+            for i in range(1, 4):
+                offset = i * 0.25
+                self.draw_line(x, y + offset, x + 1, y + offset, self.ground_group)
+
+        elif tile_char == "B":  # Bridge
+            # Draw bridge planks
+            for i in range(1, 4):
+                offset = i * 0.25
+                self.draw_line(x + offset, y, x + offset, y + 1, self.ground_group)
+
+    def update(self, dt):
+        """
+        Update the renderer.
+
+        Args:
+            dt: Time since last update
+        """
+        self.time += dt
+
+        # Flicker effect for CRT look
+        for line in self.lines:
+            # Only some lines flicker
+            if random.random() < 0.01:
+                intensity = random.uniform(0.85, 1.0)
+                line.opacity = int(line.opacity * intensity)
+
+        # Glow effect pulse
+        for glow in self.glow_lines:
+            # Make the glow pulse
+            pulse = (math.sin(self.time * 5 + random.random()) + 1) * 0.5  # 0 to 1
+            glow.opacity = int(30 + pulse * 30)  # 30 to 60
+
+    def render(self):
+        """
+        Render the batch.
+        """
+        self.batch.draw()
+
+    def clear(self):
+        """
+        Clear all lines.
+        """
+        self.lines = []
+        self.glow_lines = []
+        self.batch = pyglet.graphics.Batch()

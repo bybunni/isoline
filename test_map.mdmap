@@ -1,0 +1,24 @@
+# Level: Vector Test
+Size: 10x10
+Layers:
+  - terrain
+
+[legend: terrain]
+G = Grass
+M = Mountain
+W = Water
+B = Bridge
+
+[layer: terrain]
+~~~~~~~~
+GGGGGGGGGG
+GGGGMMGGGG
+GGMMMMGGGG
+GGGMMGGGGG
+WWWBBWWWWW
+WWWBBWWWWW
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+~~~~~~~~ 

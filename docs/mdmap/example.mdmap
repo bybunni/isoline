@@ -1,0 +1,65 @@
+# Level: Skull Canyon Bridge
+Size: 8x6
+Layers:
+  - terrain
+  - collision
+  - units
+  - loot
+
+[legend: terrain]
+G = Grass
+M = Mountain
+W = Water
+B = Bridge
+
+[legend: collision]
+. = Walkable
+X = Blocked
+
+[legend: units]
+S = Swordsman
+A = Archer
+
+[legend: loot]
+$ = Gold
+P = Potion
+
+[layer: terrain]
+~~~~~~~~
+GGGGGGGG
+GGMMMMGG
+GGMBMMGG
+WWBBBBWW
+WWGGGGWW
+GGGGGGGG
+~~~~~~~~
+
+[layer: collision]
+~~~~~~~~
+........
+..XXXX..
+..X..X..
+..####..
+..X..X..
+........
+~~~~~~~~
+
+[layer: units]
+~~~~~~~~
+........
+.....A..
+..S.....
+........
+........
+........
+~~~~~~~~
+
+[layer: loot]
+~~~~~~~~
+........
+........
+...$....
+........
+.....P..
+........
+~~~~~~~~

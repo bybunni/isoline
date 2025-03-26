@@ -1,0 +1,16 @@
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+
+# venv
+.venv/
+
+# egg-info
+*.egg-info/
+
+# mac
+.DS_Store
