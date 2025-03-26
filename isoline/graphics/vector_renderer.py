@@ -200,15 +200,16 @@ class VectorRenderer:
         apex_3d = (0, 0, h)
         
         # Project 3D points to 2D isometric view
+        # Note: Inverted the z-coordinate sign to make the pyramid point up
         base_iso = [
-            ((x3d - y3d) * sqrt3_2 + center_x, (x3d + y3d) * 0.5 - z3d + center_y)
+            ((x3d - y3d) * sqrt3_2 + center_x, (x3d + y3d) * 0.5 + z3d + center_y)
             for x3d, y3d, z3d in base_3d
         ]
         
         # Project apex
         apex_iso = (
             (apex_3d[0] - apex_3d[1]) * sqrt3_2 + center_x,
-            (apex_3d[0] + apex_3d[1]) * 0.5 - apex_3d[2] + center_y
+            (apex_3d[0] + apex_3d[1]) * 0.5 + apex_3d[2] + center_y
         )
         
         # Draw the base edges
