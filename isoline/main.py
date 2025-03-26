@@ -35,11 +35,7 @@ def main():
         mdmap_path=map_path,
     )
 
-    # Hook up key handlers
-    @game.event
-    def on_key_press(symbol, modifiers):
-        if symbol == pyglet.window.key.ESCAPE:
-            game.close()
+    # No need to hook up key handlers as they're already defined in the IsolineGame class
 
     # Run the game
     pyglet.app.run()
