@@ -36,7 +36,7 @@ class VectorRenderer:
         # Register tile renderers
         self.tile_renderers = {
             "G": self._render_grass,
-            "M": self._render_cone,
+            "M": self._render_box,
             "W": self._render_water,
             "B": self._render_bridge,
         }
@@ -164,6 +164,55 @@ class VectorRenderer:
         self.draw_line(x, y, x + 1, y + 1, group)
         self.draw_line(x + 1, y, x, y + 1, group)
     
+    def _render_box(self, x, y, group=None):
+        """
+        Render an isometric box using vector lines.
+        
+        Args:
+            x, y: Tile position in map coordinates
+            group: Rendering group
+        """
+        group = group or self.ground_group
+        
+        # Box dimensions (scaled to fit within a tile)
+        width = 0.7
+        depth = 0.7
+        height = 0.7
+        
+        # Center offset for the tile
+        center_x = x + 0.5 - width/2
+        center_y = y + 0.5 - depth/2
+        
+        # Define the vertices of the box (front face)
+        front_bl = (center_x, center_y, 0)
+        front_br = (center_x + width, center_y, 0)
+        front_tl = (center_x, center_y, height)
+        front_tr = (center_x + width, center_y, height)
+        
+        # Back face vertices
+        back_bl = (center_x, center_y + depth, 0)
+        back_br = (center_x + width, center_y + depth, 0)
+        back_tl = (center_x, center_y + depth, height)
+        back_tr = (center_x + width, center_y + depth, height)
+        
+        # Draw front face
+        self.draw_line(front_bl[0], front_bl[1], front_br[0], front_br[1], group)
+        self.draw_line(front_bl[0], front_bl[1], front_tl[0], front_tl[1], group)
+        self.draw_line(front_br[0], front_br[1], front_tr[0], front_tr[1], group)
+        self.draw_line(front_tl[0], front_tl[1], front_tr[0], front_tr[1], group)
+        
+        # Draw back face
+        self.draw_line(back_bl[0], back_bl[1], back_br[0], back_br[1], group)
+        self.draw_line(back_bl[0], back_bl[1], back_tl[0], back_tl[1], group)
+        self.draw_line(back_br[0], back_br[1], back_tr[0], back_tr[1], group)
+        self.draw_line(back_tl[0], back_tl[1], back_tr[0], back_tr[1], group)
+        
+        # Draw connecting edges
+        self.draw_line(front_bl[0], front_bl[1], back_bl[0], back_bl[1], group)
+        self.draw_line(front_br[0], front_br[1], back_br[0], back_br[1], group)
+        self.draw_line(front_tl[0], front_tl[1], back_tl[0], back_tl[1], group)
+        self.draw_line(front_tr[0], front_tr[1], back_tr[0], back_tr[1], group)
+
     def _render_cone(self, x, y, group=None, segments=12):
         """
         Render an isometric cone using vector lines.
