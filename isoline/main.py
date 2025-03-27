@@ -77,6 +77,17 @@ class IsolineApp(pyglet.window.Window):
         # Reset to center with spacebar
         if self.keys[key.SPACE]:
             self.center_map()
+            
+        # Log FPS every second
+        if hasattr(self, 'fps_log_timer'):
+            self.fps_log_timer += dt
+            if self.fps_log_timer >= 1.0:
+                # Get FPS value from fps_display object
+                fps = self.fps_display.label.text.split()[-1]
+                print(f"Current FPS: {fps}")
+                self.fps_log_timer = 0
+        else:
+            self.fps_log_timer = 0
 
     def on_draw(self):
         """Render the scene"""

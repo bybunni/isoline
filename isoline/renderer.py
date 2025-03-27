@@ -7,7 +7,7 @@ Handles rendering of isometric maps using OpenGL.
 import os
 import pyglet
 from pyglet.gl import *
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set
 
 from isoline.map_parser import MDMap, parse_mdmap
 from isoline.tile_renderer import VectorTile, create_tile
@@ -28,6 +28,15 @@ class IsometricRenderer:
         self.tile_cache: Dict[str, VectorTile] = {}
         self.x_offset = 0
         self.y_offset = 0
+        
+        # Batch for efficient rendering
+        self.batch = pyglet.graphics.Batch()
+        
+        # Track current positions of tiles for efficient updates
+        self.current_positions = {}
+        
+        # Flag to track if a full rebuild is needed
+        self.needs_rebuild = False
 
     def load_map(self, map_path: str) -> bool:
         """
@@ -42,6 +51,7 @@ class IsometricRenderer:
         try:
             self.map_data = parse_mdmap(map_path)
             self._init_tiles()
+            self.needs_rebuild = True
             return True
         except Exception as e:
             print(f"Error loading map: {e}")
@@ -49,11 +59,9 @@ class IsometricRenderer:
 
     def _init_tiles(self):
         """Initialize tile cache for the loaded map"""
-        # Clear existing cache
-        for tile in self.tile_cache.values():
-            tile.delete()
-        self.tile_cache.clear()
-
+        # Clear existing cache and batch
+        self.cleanup()
+        
         if not self.map_data:
             return
 
@@ -76,16 +84,70 @@ class IsometricRenderer:
 
     def set_offset(self, x: int, y: int):
         """Set the rendering offset for the map"""
-        self.x_offset = x
-        self.y_offset = y
+        if x != self.x_offset or y != self.y_offset:
+            self.x_offset = x
+            self.y_offset = y
+            self.needs_rebuild = True
+
+    def _rebuild_batch(self):
+        """Rebuild the entire rendering batch with current positions"""
+        # Create a new batch
+        self.batch = pyglet.graphics.Batch()
+        self.current_positions.clear()
+        
+        if not self.map_data or not self.map_data.header:
+            return
+            
+        # Add all tiles to the batch at their current positions
+        for layer_name in self.map_data.header.layers:
+            self._add_layer_to_batch(layer_name)
+            
+        self.needs_rebuild = False
+
+    def _add_layer_to_batch(self, layer_name: str):
+        """Add a specific layer to the batch"""
+        layer = self.map_data.get_layer(layer_name)
+        if not layer or not self.map_data.header:
+            return
+
+        # Get dimensions
+        width = self.map_data.header.width
+        height = self.map_data.header.height
+
+        # Calculate starting position based on map dimensions
+        x_start = self.x_offset
+        y_start = self.y_offset
+
+        # Add each tile to the batch
+        for y in range(height):
+            for x in range(width):
+                tile_type = layer.grid[y][x]
+                if tile_type in self.tile_cache:
+                    # Calculate isometric position
+                    x_screen = (
+                        x_start
+                        + (x * self.tile_width // 2)
+                        - (y * self.tile_width // 2)
+                    )
+                    y_screen = (
+                        y_start
+                        + (x * self.tile_height // 2)
+                        + (y * self.tile_height // 2)
+                    )
+
+                    # Add to batch and track position
+                    position_key = (layer_name, x, y)
+                    self.tile_cache[tile_type].add_to_batch(x_screen, y_screen, self.batch)
+                    self.current_positions[position_key] = (tile_type, x_screen, y_screen)
 
     def render(self):
         """Render the isometric map"""
         if not self.map_data or not self.map_data.header:
             return
 
-        # Clear the screen
-        glClear(GL_COLOR_BUFFER_BIT)
+        # Rebuild batch if needed (offset changed or map loaded)
+        if self.needs_rebuild:
+            self._rebuild_batch()
 
         # Setup OpenGL state for rendering
         try:
@@ -99,13 +161,8 @@ class IsometricRenderer:
         except:
             pass  # Continue without line width if not available
 
-        # Render each layer in order
-        for layer_name in self.map_data.header.layers:
-            layer = self.map_data.get_layer(layer_name)
-            if not layer:
-                continue
-
-            self._render_layer(layer_name)
+        # Draw all tiles with a single batch draw call
+        self.batch.draw()
 
         # Reset OpenGL state
         try:
@@ -113,45 +170,10 @@ class IsometricRenderer:
         except:
             pass
 
-    def _render_layer(self, layer_name: str):
-        """Render a specific layer of the map"""
-        layer = self.map_data.get_layer(layer_name)
-        if not layer or not self.map_data.header:
-            return
-
-        # Get dimensions
-        width = self.map_data.header.width
-        height = self.map_data.header.height
-
-        # Calculate starting position based on map dimensions
-        # Center the map on screen
-        x_start = self.x_offset
-        y_start = self.y_offset
-
-        # Render each tile
-        for y in range(height):
-            for x in range(width):
-                tile_type = layer.grid[y][x]
-                if tile_type in self.tile_cache:
-                    # Calculate isometric position using the formulas from SRD:
-                    # x_screen = x_start + (x * TILE_WIDTH/2) - (y * TILE_WIDTH/2)
-                    # y_screen = y_start + (x * TILE_HEIGHT/2) + (y * TILE_HEIGHT/2)
-                    x_screen = (
-                        x_start
-                        + (x * self.tile_width // 2)
-                        - (y * self.tile_width // 2)
-                    )
-                    y_screen = (
-                        y_start
-                        + (x * self.tile_height // 2)
-                        + (y * self.tile_height // 2)
-                    )
-
-                    # Draw the tile
-                    self.tile_cache[tile_type].draw(x_screen, y_screen)
-
     def cleanup(self):
         """Clean up OpenGL resources"""
         for tile in self.tile_cache.values():
             tile.delete()
         self.tile_cache.clear()
+        self.current_positions.clear()
+        self.batch = pyglet.graphics.Batch()
