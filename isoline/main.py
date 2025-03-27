@@ -8,7 +8,7 @@ import os
 import sys
 import pyglet
 from pyglet.gl import *
-from pyglet.window import key
+from pyglet.window import key, FPSDisplay
 from pyglet.math import Mat4, Vec3
 
 from isoline.renderer import IsometricRenderer
@@ -43,6 +43,12 @@ class IsolineApp(pyglet.window.Window):
 
         # Setup update event
         pyglet.clock.schedule_interval(self.update, 1 / 60.0)
+        
+        # FPS display in the top-left corner
+        self.fps_display = FPSDisplay(self)
+        self.fps_display.label.x = 10
+        self.fps_display.label.y = self.height - 30
+        self.fps_display.label.font_size = 14
 
     def center_map(self):
         """Center the map in the window"""
@@ -60,9 +66,9 @@ class IsolineApp(pyglet.window.Window):
         """Update game state"""
         # Handle keyboard navigation
         if self.keys[key.UP]:
-            self.renderer.y_offset += self.pan_speed
-        if self.keys[key.DOWN]:
             self.renderer.y_offset -= self.pan_speed
+        if self.keys[key.DOWN]:
+            self.renderer.y_offset += self.pan_speed
         if self.keys[key.LEFT]:
             self.renderer.x_offset += self.pan_speed
         if self.keys[key.RIGHT]:
@@ -79,11 +85,17 @@ class IsolineApp(pyglet.window.Window):
         # Pyglet automatically sets up a 2D projection for us
         # Just render the map
         self.renderer.render()
+        
+        # Draw the FPS counter
+        self.fps_display.draw()
 
     def on_resize(self, width, height):
         """Handle window resize"""
         # Modern OpenGL approach using pyglet's default handling
         super().on_resize(width, height)
+        
+        # Update FPS display position
+        self.fps_display.label.y = height - 30
 
         # Re-center map
         self.center_map()
