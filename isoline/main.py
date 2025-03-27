@@ -64,15 +64,23 @@ class IsolineApp(pyglet.window.Window):
 
     def update(self, dt):
         """Update game state"""
+        # Get current offsets
+        x_offset = self.renderer.x_offset
+        y_offset = self.renderer.y_offset
+        
         # Handle keyboard navigation
         if self.keys[key.UP]:
-            self.renderer.y_offset -= self.pan_speed
+            y_offset -= self.pan_speed
         if self.keys[key.DOWN]:
-            self.renderer.y_offset += self.pan_speed
+            y_offset += self.pan_speed
         if self.keys[key.LEFT]:
-            self.renderer.x_offset += self.pan_speed
+            x_offset += self.pan_speed
         if self.keys[key.RIGHT]:
-            self.renderer.x_offset -= self.pan_speed
+            x_offset -= self.pan_speed
+            
+        # Set the new offset using the proper method that triggers a batch rebuild
+        if x_offset != self.renderer.x_offset or y_offset != self.renderer.y_offset:
+            self.renderer.set_offset(x_offset, y_offset)
 
         # Reset to center with spacebar
         if self.keys[key.SPACE]:

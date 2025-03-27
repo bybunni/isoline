@@ -65,10 +65,15 @@ class VectorTile:
         # Use tuple of position as a key
         pos_key = (x, y)
         
-        # Create and store shapes for this position if not already done
-        if pos_key not in self.shapes_by_position:
-            shapes_list = self.create_shapes_for_batch(x, y, batch)
-            self.shapes_by_position[pos_key] = shapes_list
+        # Always recreate shapes for this position to ensure camera movement works
+        # Delete old shapes at this position if they exist
+        if pos_key in self.shapes_by_position:
+            for shape in self.shapes_by_position[pos_key]:
+                shape.delete()
+        
+        # Create new shapes for the current position
+        shapes_list = self.create_shapes_for_batch(x, y, batch)
+        self.shapes_by_position[pos_key] = shapes_list
     
     def delete(self):
         """Clean up resources"""
