@@ -41,11 +41,24 @@ Isoline is a retro-inspired isometric game engine that renders all graphics usin
 
 ### Running the Demo
 
-To run the basic grass field example:
+To run the default map example:
 
 ```bash
 python -m isoline.main
 ```
+
+To run a specific map file:
+
+```bash
+python -m isoline.main --map maps/terrain.mdmap
+# Or use the short option format
+python -m isoline.main -m terrain
+```
+
+The `--map` argument accepts:
+- Full absolute paths to .mdmap files
+- Relative paths from the current directory
+- Simple map names (with or without .mdmap extension) that will be searched for in the maps/ directory
 
 ### Controls
 

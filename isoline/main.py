@@ -6,6 +6,7 @@ Entry point for the isometric vector graphics engine.
 
 import os
 import sys
+import argparse
 import pyglet
 from pyglet.gl import *
 from pyglet.window import key, FPSDisplay
@@ -134,13 +135,47 @@ class IsolineApp(pyglet.window.Window):
 
 def main():
     """Main entry point"""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Isoline Engine - Isometric Vector Graphics Engine')
+    parser.add_argument('--map', '-m', type=str, help='Path to the map file (.mdmap)')
+    args = parser.parse_args()
+    
     # Create the application window
     app = IsolineApp()
 
     # Find the map file
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    map_path = os.path.join(current_dir, "grass.mdmap")
-
+    if args.map:
+        # Use the provided map path
+        if os.path.isabs(args.map):
+            map_path = args.map
+        else:
+            # Relative path - check if it's a path relative to current directory
+            if os.path.exists(args.map):
+                map_path = os.path.abspath(args.map)
+            else:
+                # Check if it's in the maps directory
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                maps_dir = os.path.join(project_root, 'maps')
+                map_path = os.path.join(maps_dir, args.map)
+                
+                # If no extension provided, add .mdmap extension
+                if not os.path.splitext(map_path)[1]:
+                    map_path += '.mdmap'
+    else:
+        # Default map - look for default.mdmap in maps directory first
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        maps_dir = os.path.join(project_root, 'maps')
+        default_map = os.path.join(maps_dir, 'default.mdmap')
+        
+        if os.path.exists(default_map):
+            map_path = default_map
+        else:
+            # Fallback to the original grass map in the isoline package
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            map_path = os.path.join(current_dir, 'grass.mdmap')
+    
+    print(f"Loading map: {map_path}")
+    
     # Load the map
     if not app.load_map(map_path):
         print(f"Error: Could not load map at {map_path}")
