@@ -1,2 +1,2 @@
 - you need to activate the .venv the first time you use it
-- we use uv
+- we use uv for dependency and virtual environment management
