@@ -44,7 +44,7 @@ Isoline is a retro-inspired isometric game engine that renders all graphics usin
 To run the basic grass field example:
 
 ```bash
-python run_isoline.py
+python -m isoline.main
 ```
 
 ### Controls
