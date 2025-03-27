@@ -1,0 +1,16 @@
+# Level: Grass Field
+Size: 5x5
+Layers:
+  - terrain
+
+[legend: terrain]
+G = Grass
+
+[layer: terrain]
+~~~~~~~~
+GGGGG
+GGGGG
+GGGGG
+GGGGG
+GGGGG
+~~~~~~~~ 
