@@ -31,9 +31,9 @@ class VectorTile:
         self.width = width
         self.height = height
 
-        # Default colors
-        self.outline_color = (0, 51, 0, 255)  # Dark green (RGBA)
-        self.content_color = (0, 204, 0, 255)  # Bright green (RGBA)
+        # Temporary debugging colors: set both outline and content to bright white so they are visible
+        self.outline_color = (255, 255, 255, 255)  # Bright white
+        self.content_color = (255, 255, 255, 255)  # Bright white
 
         # Create outline points (relative to 0,0)
         # Adjusted for pyglet's coordinate system (bottom-left origin)

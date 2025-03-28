@@ -35,22 +35,22 @@ class IsometricRenderer:
         self.tile_cache: Dict[str, VectorTile] = {}
         self.x_offset = 0
         self.y_offset = 0
-        
+
         # Batch for efficient rendering - VBOs will be added here
         self.batch = pyglet.graphics.Batch()
-        
+
         # Track tile instances associated with grid positions for updates
         # Maps (layer_name, grid_x, grid_y) -> (tile_type, screen_x, screen_y)
         self.current_positions = {}
-        
+
         # Track visible region for culling
         self.viewport_width = 800  # Default, will be updated on resize
         self.viewport_height = 600  # Default, will be updated on resize
-        
+
         # Track which grid positions need updates (VBO recreation/deletion)
         self.needs_rebuild = False
         self.dirty_tiles: Set[Tuple[str, int, int]] = set()  # Layer, x, y grid coords
-        
+
         # Animation settings
         self.animation_enabled = True
         self.animation_frame_time = 0.25  # Seconds between animation frames
@@ -79,7 +79,7 @@ class IsometricRenderer:
         """Initialize tile cache for the loaded map"""
         # Clear existing cache and ensure all old VBOs are deleted
         self.cleanup()
-        
+
         if not self.map_data:
             return
 
@@ -107,15 +107,15 @@ class IsometricRenderer:
         """
         if x == self.x_offset and y == self.y_offset:
             return
-            
+
         # Save old offset for calculating position deltas
         old_x_offset = self.x_offset
         old_y_offset = self.y_offset
-        
+
         # Update offsets
         self.x_offset = x
         self.y_offset = y
-        
+
         # A significant camera move invalidates all current VBO positions
         # Mark for full rebuild - cleanup happens in _rebuild_batch
         if abs(x - old_x_offset) > self.viewport_width // 2 or abs(y - old_y_offset) > self.viewport_height // 2:
@@ -126,7 +126,7 @@ class IsometricRenderer:
             for pos_key in list(self.current_positions.keys()):
                 # Mark grid positions as dirty. _update_dirty_tiles will handle VBO management.
                 self.dirty_tiles.add(pos_key)
-                
+
     def set_viewport_size(self, width: int, height: int):
         """Update the viewport size for culling calculations"""
         self.viewport_width = width
@@ -140,26 +140,26 @@ class IsometricRenderer:
         """
         if not self.map_data or not self.map_data.header:
             return
-            
+
         if self.needs_rebuild:
             # Create a new batch
             old_batch = self.batch
             self.batch = pyglet.graphics.Batch()
-            
-            # --- VBO Cleanup --- 
+
+            # --- VBO Cleanup ---
             # Before rebuilding, ensure all VBOs associated with the *old* batch
             # are deleted from the GPU and tile instances.
             for tile in self.tile_cache.values():
                 tile.delete() # This clears tile._active_vertex_lists
             # --- End VBO Cleanup ---
-                
+
             self.current_positions.clear()
             self.dirty_tiles.clear()
-            
+
             # Add all tiles to the batch at their current positions
             for layer_name in self.map_data.header.layers:
                 self._add_layer_to_batch(layer_name)
-                
+
             self.needs_rebuild = False
         elif self.dirty_tiles:
             # Incremental update - only update tiles that have been marked as dirty
@@ -186,7 +186,7 @@ class IsometricRenderer:
         # Calculate visible region bounds with padding
         # The padding ensures tiles that are partially visible are still rendered
         padding = max(self.tile_width, self.tile_height) * 2
-        
+
         # Add each tile to the batch if potentially visible
         for y in range(height):
             for x in range(width):
@@ -203,7 +203,7 @@ class IsometricRenderer:
                         + (x * self.tile_height // 2)
                         + (y * self.tile_height // 2)
                     )
-                    
+
                     # Only add tiles that are potentially visible (with padding)
                     if self._is_potentially_visible(x_screen, y_screen, padding):
                         # Add VBO to batch and track grid position <-> screen position
@@ -224,7 +224,7 @@ class IsometricRenderer:
             y_screen + self.tile_height + padding >= 0 and
             y_screen - padding <= self.viewport_height
         )
-        
+
     def _update_dirty_tiles(self):
         """
         Update only the tiles corresponding to dirty grid positions.
@@ -232,20 +232,20 @@ class IsometricRenderer:
         """
         if not self.map_data or not self.map_data.header:
             return
-            
+
         # For each dirty grid position, update the corresponding tile's VBO
         for position_key in self.dirty_tiles:
             layer_name, x, y = position_key
-            
+
             # Get the tile type and instance for this grid position
             layer = self.map_data.get_layer(layer_name)
             if not layer:
                 continue
-                
+
             tile_type = layer.grid[y][x]
             if tile_type not in self.tile_cache:
                 continue
-                
+
             tile = self.tile_cache[tile_type]
 
             # Calculate new screen position
@@ -259,10 +259,10 @@ class IsometricRenderer:
                 + (x * self.tile_height // 2)
                 + (y * self.tile_height // 2)
             )
-            
+
             new_screen_pos_key = (new_x_screen, new_y_screen)
-            
-            # --- VBO Management --- 
+
+            # --- VBO Management ---
             # Check if there was a VBO at the *old* screen position for this grid position
             if position_key in self.current_positions:
                 old_tile_type, old_x, old_y = self.current_positions[position_key]
@@ -273,7 +273,7 @@ class IsometricRenderer:
                     # Delete the VBO at the *old* screen position
                     old_tile.delete_vbo_at_position(old_screen_pos_key)
             # --- End VBO Management ---
-            
+
             # Add VBO at the *new* position if potentially visible
             if self._is_potentially_visible(new_x_screen, new_y_screen, max(self.tile_width, self.tile_height) * 2):
                 tile.add_to_batch(new_x_screen, new_y_screen, self.batch)
@@ -282,7 +282,7 @@ class IsometricRenderer:
                 # Tile is no longer visible, ensure its removed from tracking
                 if position_key in self.current_positions:
                     del self.current_positions[position_key]
-    
+
     def update_animation(self, dt: float):
         """
         Update tile animations based on elapsed time.
@@ -292,29 +292,29 @@ class IsometricRenderer:
         """
         if not self.animation_enabled:
             return
-            
+
         # Accumulate time
         self.animation_time_elapsed += dt
-        
+
         # Check if we should advance animation frame
         if self.animation_time_elapsed >= self.animation_frame_time:
             # Reset timer
             self.animation_time_elapsed = 0
-            
+
             # Advance animation state for all tiles in cache
             animated_tiles_updated = False
             for tile_type, tile in self.tile_cache.items():
                 if tile.animated:
                     tile.advance_state()
                     animated_tiles_updated = True
-            
+
             # If any animated tiles were updated, mark all their positions as dirty
             if animated_tiles_updated: # Mark the *grid position* as dirty
                 for pos_key, (tile_type, _, _) in self.current_positions.items():
                     tile = self.tile_cache.get(tile_type)
                     if tile and tile.animated:
                         self.dirty_tiles.add(pos_key)
-    
+
     def render(self):
         """
         Render the isometric map.
@@ -332,7 +332,7 @@ class IsometricRenderer:
         try:
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            glLineWidth(1.0)
+            glLineWidth(3.0)
         except:
             pass  # Continue if OpenGL features not available
 
@@ -353,7 +353,7 @@ class IsometricRenderer:
             frame_time: Time in seconds between animation frames
         """
         self.animation_frame_time = max(0.05, frame_time)  # Enforce minimum frame time
-        
+
     def enable_animation(self, enabled: bool = True):
         """
         Enable or disable animation.
@@ -362,7 +362,7 @@ class IsometricRenderer:
             enabled: Whether animation should be enabled
         """
         self.animation_enabled = enabled
-        
+
     def cleanup(self):
         """Clean up OpenGL resources"""
         for tile in self.tile_cache.values():
