@@ -23,7 +23,9 @@ class IsolineApp(pyglet.window.Window):
         super().__init__(width, height, title, resizable=True)
 
         # Setup OpenGL with minimal state setup
-        glClearColor(0.05, 0.05, 0.05, 1.0)  # Dark background
+        glClearColor(0.0, 0.0, 0.0, 1.0)  # Black background for contrast with green lines
+        
+        # Skip the projection matrix setup - we'll use pyglet's defaults
         
         # Enable blending for transparency
         glEnable(GL_BLEND)
@@ -38,7 +40,7 @@ class IsolineApp(pyglet.window.Window):
             
         # Set line width for visible lines (use a valid width)
         try:
-            glLineWidth(1.0)  # Use 1.0 as a safe default
+            glLineWidth(2.0)  # Use 2.0 for more visible lines
         except Exception as e:
             print(f"Error setting line width: {e}")
 
@@ -164,6 +166,8 @@ class IsolineApp(pyglet.window.Window):
         # Update FPS display position
         self.fps_display.label.y = height - 30
 
+        # Skip updating the OpenGL projection - we'll use pyglet's defaults
+
         # Update renderer viewport size for culling optimization
         self.renderer.set_viewport_size(width, height)
         
@@ -176,14 +180,14 @@ class IsolineApp(pyglet.window.Window):
         """Handle key press events"""
         if symbol == key.ESCAPE:
             pyglet.app.exit()
-        elif symbol == key.F1:
+        elif symbol == key.H:
             # Display help
             print("\nIsoline Controls:")
             print("  Arrow Keys: Pan the map")
             print("  Space: Center the map")
             print("  A: Toggle animation")
             print("  +/-: Increase/decrease animation speed")
-            print("  F1: Show this help")
+            print("  H: Show this help")
             print("  ESC: Exit\n")
         return pyglet.event.EVENT_HANDLED
 

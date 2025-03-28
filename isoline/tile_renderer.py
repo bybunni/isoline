@@ -31,9 +31,9 @@ class VectorTile:
         self.width = width
         self.height = height
 
-        # Temporary debugging colors: set both outline and content to bright white so they are visible
-        self.outline_color = (255, 255, 255, 255)  # Bright white
-        self.content_color = (255, 255, 255, 255)  # Bright white
+        # Use bright green colors for visibility (classic terminal look)
+        self.outline_color = (0, 255, 0, 255)  # Bright green
+        self.content_color = (0, 255, 0, 255)  # Bright green
 
         # Create outline points (relative to 0,0)
         # Adjusted for pyglet's coordinate system (bottom-left origin)
@@ -296,20 +296,34 @@ class VectorTile:
                     self.parent = None  # For compatibility with batch system
                 
                 def draw(self):
-                    # Set rendering state
-                    glEnableClientState(GL_VERTEX_ARRAY)
-                    glEnableClientState(GL_COLOR_ARRAY)
+                    # Use immediate mode since we're having compatibility issues
+                    # with the client array interface in this version of Pyglet
                     
-                    # Set up the arrays
-                    glVertexPointer(2, GL_FLOAT, 0, self.position_data)
-                    glColorPointer(4, GL_UNSIGNED_BYTE, 0, self.color_data)
+                    # Convert position data to Python list for iteration
+                    positions = [self.position_data[i] for i in range(len(self.position_data))]
+                    colors = [self.color_data[i] for i in range(len(self.color_data))]
                     
-                    # Draw the primitives
-                    glDrawArrays(self.mode, 0, self.count)
+                    # Draw lines using immediate mode (old-school OpenGL)
+                    glBegin(self.mode)
                     
-                    # Clean up state
-                    glDisableClientState(GL_COLOR_ARRAY)
-                    glDisableClientState(GL_VERTEX_ARRAY)
+                    for i in range(0, self.count):
+                        # Set color for the vertex
+                        idx = i * 4  # 4 components per color (RGBA)
+                        if idx < len(colors):
+                            r = colors[idx] / 255.0
+                            g = colors[idx + 1] / 255.0
+                            b = colors[idx + 2] / 255.0
+                            a = colors[idx + 3] / 255.0
+                            glColor4f(r, g, b, a)
+                        
+                        # Set position for the vertex
+                        pos_idx = i * 2  # 2 components per position (x, y)
+                        if pos_idx < len(positions):
+                            x = positions[pos_idx]
+                            y = positions[pos_idx + 1]
+                            glVertex2f(x, y)
+                    
+                    glEnd()
                 
                 def delete(self):
                     # Nothing to do for our simple implementation

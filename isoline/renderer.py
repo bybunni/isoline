@@ -38,9 +38,6 @@ class IsometricRenderer:
 
         # Batch for efficient rendering - VBOs will be added here
         self.batch = pyglet.graphics.Batch()
-        
-        # Custom vertex lists (for direct rendering)
-        self.custom_vertex_lists = []
 
         # Track tile instances associated with grid positions for updates
         # Maps (layer_name, grid_x, grid_y) -> (tile_type, screen_x, screen_y)
@@ -148,7 +145,6 @@ class IsometricRenderer:
             # Create a new batch
             old_batch = self.batch
             self.batch = pyglet.graphics.Batch()
-            self.custom_vertex_lists = []  # Clear custom vertex lists when rebuilding
 
             # --- VBO Cleanup ---
             # Before rebuilding, ensure all VBOs associated with the *old* batch
@@ -330,100 +326,24 @@ class IsometricRenderer:
         # Update batch if needed (offset changed or map loaded)
         if self.needs_rebuild or self.dirty_tiles:
             self._rebuild_batch()
-            
-        # Set up OpenGL state for rendering
-        original_blend = glIsEnabled(GL_BLEND)
-        original_line_smooth = glIsEnabled(GL_LINE_SMOOTH)
-        
-        # Store original line width
-        line_width = GLfloat()
-        glGetFloatv(GL_LINE_WIDTH, line_width)
-        
-        # Set up our rendering state
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        
+
+        # Setup OpenGL state for rendering - minimizing state changes
+        # We only set these states once per frame
         try:
-            glEnable(GL_LINE_SMOOTH)
-            glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
+            glEnable(GL_BLEND)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glLineWidth(3.0)
         except:
-            pass
-        
+            pass  # Continue if OpenGL features not available
+
+        # Draw all tiles with a single batch draw call
+        self.batch.draw()
+
+        # Reset OpenGL state
         try:
-            glLineWidth(1.0)
-        except:
-            pass
-        
-        # First try standard batch rendering (might not work with our custom vertex lists)
-        try:
-            self.batch.draw()
-        except Exception as e:
-            print(f"Batch draw error: {e}")
-        
-        # Draw our custom vertex lists directly
-        for vlist in self.custom_vertex_lists:
-            try:
-                vlist.draw()
-            except Exception as e:
-                print(f"Error drawing custom vertex list: {e}")
-        
-        # Restore OpenGL state
-        if not original_blend:
             glDisable(GL_BLEND)
-        if not original_line_smooth:
-            glDisable(GL_LINE_SMOOTH)
-        
-        # Restore original line width
-        try:
-            glLineWidth(line_width.value)
         except:
             pass
-            
-    def _draw_debug_grid(self):
-        """Draw a simple grid to show that OpenGL is working"""
-        # Define grid size and spacing
-        grid_size = 10
-        grid_spacing = 50
-        center_x, center_y = self.viewport_width // 2, self.viewport_height // 2
-        
-        # Store original line width
-        line_width = GLfloat()
-        glGetFloatv(GL_LINE_WIDTH, line_width)
-        
-        # Draw grid
-        glColor4f(0.2, 0.5, 0.2, 0.5)  # Green color
-        glBegin(GL_LINES)
-        
-        # Horizontal lines
-        for i in range(-grid_size, grid_size + 1):
-            y = center_y + i * grid_spacing
-            glVertex2f(center_x - grid_size * grid_spacing, y)
-            glVertex2f(center_x + grid_size * grid_spacing, y)
-            
-        # Vertical lines
-        for i in range(-grid_size, grid_size + 1):
-            x = center_x + i * grid_spacing
-            glVertex2f(x, center_y - grid_size * grid_spacing)
-            glVertex2f(x, center_y + grid_size * grid_spacing)
-            
-        glEnd()
-        
-        # Draw axes
-        glColor4f(1.0, 0.0, 0.0, 0.8)  # Red for X axis
-        glLineWidth(3.0)
-        glBegin(GL_LINES)
-        glVertex2f(center_x - grid_size * grid_spacing, center_y)
-        glVertex2f(center_x + grid_size * grid_spacing, center_y)
-        glEnd()
-        
-        glColor4f(0.0, 0.0, 1.0, 0.8)  # Blue for Y axis
-        glBegin(GL_LINES)
-        glVertex2f(center_x, center_y - grid_size * grid_spacing)
-        glVertex2f(center_x, center_y + grid_size * grid_spacing)
-        glEnd()
-        
-        # Restore original line width
-        glLineWidth(line_width.value)
 
     def set_animation_speed(self, frame_time: float):
         """
@@ -450,5 +370,4 @@ class IsometricRenderer:
         self.tile_cache.clear()
         self.current_positions.clear()
         self.dirty_tiles.clear()
-        self.custom_vertex_lists = []
         self.batch = pyglet.graphics.Batch()
