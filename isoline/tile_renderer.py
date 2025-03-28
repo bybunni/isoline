@@ -65,8 +65,8 @@ class VectorTile:
 
         # Define standard attribute names and formats used by this tile type
         self._attribute_formats = {
-            'vertices': {'format': ('f', 2), 'usage': 'static'},
-            'colors': {'format': ('B', 4), 'usage': 'static'}
+            'vertices': {'format': ('f', 2), 'usage': 'static', 'location': 0},
+            'colors': {'format': ('B', 4), 'usage': 'static', 'location': 1}
         }
         # Use attribute formats directly as domain attributes
         self._domain_attributes = self._attribute_formats
