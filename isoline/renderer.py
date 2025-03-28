@@ -367,7 +367,7 @@ class IsometricRenderer:
             # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             # glLineWidth(3.0) # Keep line width thicker for visibility if it works
             # Set back to 1.0 as 3.0 caused GL_INVALID_VALUE
-            glLineWidth(1.0)
+            # glLineWidth(1.0)
             pass  # Keep the try/except structure
         except:
             pass  # Continue if OpenGL features not available

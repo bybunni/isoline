@@ -42,7 +42,7 @@ class IsolineApp(pyglet.window.Window):
 
         # Set line width for visible lines (use a valid width)
         try:
-            glLineWidth(2.0)  # Use 2.0 for more visible lines
+            glLineWidth(1.0)  # Use 2.0 for more visible lines
         except Exception as e:
             print(f"Error setting line width: {e}")
 
