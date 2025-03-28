@@ -33,6 +33,9 @@ class IsolineApp(pyglet.window.Window):
 
         # Create renderer
         self.renderer = IsometricRenderer()
+        
+        # Set viewport size in renderer for culling optimization
+        self.renderer.set_viewport_size(width, height)
 
         # Set default map offset to center of screen
         self.center_map()
@@ -91,8 +94,9 @@ class IsolineApp(pyglet.window.Window):
         if hasattr(self, 'fps_log_timer'):
             self.fps_log_timer += dt
             if self.fps_log_timer >= 1.0:
-                # Get FPS value from fps_display object
-                fps = self.fps_display.label.text.split()[-1]
+                # Safely get FPS value from fps_display object
+                text_parts = self.fps_display.label.text.split()
+                fps = text_parts[-1] if len(text_parts) > 0 else "N/A"
                 print(f"Current FPS: {fps}")
                 self.fps_log_timer = 0
         else:
@@ -117,6 +121,9 @@ class IsolineApp(pyglet.window.Window):
         # Update FPS display position
         self.fps_display.label.y = height - 30
 
+        # Update renderer viewport size for culling optimization
+        self.renderer.set_viewport_size(width, height)
+        
         # Re-center map
         self.center_map()
 

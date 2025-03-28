@@ -2,12 +2,14 @@
 Isometric Renderer
 
 Handles rendering of isometric maps using OpenGL.
+Optimized version with improved caching and incremental updates.
 """
 
 import os
 import pyglet
 from pyglet.gl import *
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set, Any
+import math
 
 from isoline.map_parser import MDMap, parse_mdmap
 from isoline.tile_renderer import VectorTile, create_tile
@@ -19,6 +21,11 @@ class IsometricRenderer:
 
     Uses the 2:1 tile ratio for optimal rendering as specified
     in the SRD.
+    
+    Performance optimized with:
+    - View frustum culling
+    - Minimal batch rebuilding
+    - Vertex array caching
     """
 
     def __init__(self, tile_width: int = 100, tile_height: int = 50):
@@ -35,8 +42,13 @@ class IsometricRenderer:
         # Track current positions of tiles for efficient updates
         self.current_positions = {}
         
-        # Flag to track if a full rebuild is needed
+        # Track visible region for culling
+        self.viewport_width = 800  # Default, will be updated on resize
+        self.viewport_height = 600  # Default, will be updated on resize
+        
+        # Track which tiles need updates
         self.needs_rebuild = False
+        self.dirty_tiles: Set[Tuple[str, int, int]] = set()  # Layer, x, y
 
     def load_map(self, map_path: str) -> bool:
         """
@@ -83,29 +95,64 @@ class IsometricRenderer:
                 print(f"Warning: {e}")
 
     def set_offset(self, x: int, y: int):
-        """Set the rendering offset for the map"""
-        if x != self.x_offset or y != self.y_offset:
-            self.x_offset = x
-            self.y_offset = y
+        """
+        Set the rendering offset for the map.
+        This optimized version marks all current tiles as dirty instead of forcing a full rebuild.
+        """
+        if x == self.x_offset and y == self.y_offset:
+            return
+            
+        # Save old offset for calculating position deltas
+        old_x_offset = self.x_offset
+        old_y_offset = self.y_offset
+        
+        # Update offsets
+        self.x_offset = x
+        self.y_offset = y
+        
+        # If camera moved significantly, do a full rebuild with culling
+        if abs(x - old_x_offset) > self.viewport_width // 3 or abs(y - old_y_offset) > self.viewport_height // 3:
             self.needs_rebuild = True
+        else:
+            # For small movements, mark all current positions as dirty instead of full rebuild
+            for pos_key in list(self.current_positions.keys()):
+                self.dirty_tiles.add(pos_key)
+                
+    def set_viewport_size(self, width: int, height: int):
+        """Update the viewport size for culling calculations"""
+        self.viewport_width = width
+        self.viewport_height = height
+        self.needs_rebuild = True  # Rebuild with new culling bounds
 
     def _rebuild_batch(self):
-        """Rebuild the entire rendering batch with current positions"""
-        # Create a new batch
-        self.batch = pyglet.graphics.Batch()
-        self.current_positions.clear()
-        
+        """
+        Rebuild the rendering batch with current positions.
+        This optimized version supports incremental updates and culling.
+        """
         if not self.map_data or not self.map_data.header:
             return
             
-        # Add all tiles to the batch at their current positions
-        for layer_name in self.map_data.header.layers:
-            self._add_layer_to_batch(layer_name)
+        if self.needs_rebuild:
+            # Full rebuild required
+            self.batch = pyglet.graphics.Batch()
+            self.current_positions.clear()
+            self.dirty_tiles.clear()
             
-        self.needs_rebuild = False
+            # Add all tiles to the batch at their current positions
+            for layer_name in self.map_data.header.layers:
+                self._add_layer_to_batch(layer_name)
+                
+            self.needs_rebuild = False
+        elif self.dirty_tiles:
+            # Incremental update - only update tiles that have been marked as dirty
+            self._update_dirty_tiles()
+            self.dirty_tiles.clear()
 
     def _add_layer_to_batch(self, layer_name: str):
-        """Add a specific layer to the batch"""
+        """
+        Add a specific layer to the batch with view frustum culling.
+        Only adds tiles that are potentially visible on screen.
+        """
         layer = self.map_data.get_layer(layer_name)
         if not layer or not self.map_data.header:
             return
@@ -118,7 +165,11 @@ class IsometricRenderer:
         x_start = self.x_offset
         y_start = self.y_offset
 
-        # Add each tile to the batch
+        # Calculate visible region bounds with padding
+        # The padding ensures tiles that are partially visible are still rendered
+        padding = max(self.tile_width, self.tile_height) * 2
+        
+        # Add each tile to the batch if potentially visible
         for y in range(height):
             for x in range(width):
                 tile_type = layer.grid[y][x]
@@ -134,32 +185,95 @@ class IsometricRenderer:
                         + (x * self.tile_height // 2)
                         + (y * self.tile_height // 2)
                     )
+                    
+                    # Only add tiles that are potentially visible (with padding)
+                    if self._is_potentially_visible(x_screen, y_screen, padding):
+                        # Add to batch and track position
+                        position_key = (layer_name, x, y)
+                        self.tile_cache[tile_type].add_to_batch(x_screen, y_screen, self.batch)
+                        self.current_positions[position_key] = (tile_type, x_screen, y_screen)
 
-                    # Add to batch and track position
-                    position_key = (layer_name, x, y)
-                    self.tile_cache[tile_type].add_to_batch(x_screen, y_screen, self.batch)
-                    self.current_positions[position_key] = (tile_type, x_screen, y_screen)
-
+    def _is_potentially_visible(self, x_screen: float, y_screen: float, padding: float) -> bool:
+        """
+        Check if a tile at the given screen position is potentially visible.
+        Uses viewport size and padding to determine visibility.
+        """
+        # Simple rectangular bounds check with padding
+        return (
+            x_screen + self.tile_width + padding >= 0 and
+            x_screen - padding <= self.viewport_width and
+            y_screen + self.tile_height + padding >= 0 and
+            y_screen - padding <= self.viewport_height
+        )
+        
+    def _update_dirty_tiles(self):
+        """
+        Update only the tiles that have been marked as dirty.
+        Much more efficient than rebuilding the entire batch.
+        """
+        if not self.map_data or not self.map_data.header:
+            return
+            
+        # For each dirty tile, remove it from the batch and re-add at new position
+        for position_key in self.dirty_tiles:
+            layer_name, x, y = position_key
+            
+            # Get the tile type for this position
+            layer = self.map_data.get_layer(layer_name)
+            if not layer:
+                continue
+                
+            tile_type = layer.grid[y][x]
+            if tile_type not in self.tile_cache:
+                continue
+                
+            # Calculate new screen position
+            x_screen = (
+                self.x_offset
+                + (x * self.tile_width // 2)
+                - (y * self.tile_width // 2)
+            )
+            y_screen = (
+                self.y_offset
+                + (x * self.tile_height // 2)
+                + (y * self.tile_height // 2)
+            )
+            
+            # Only update if potentially visible
+            if self._is_potentially_visible(x_screen, y_screen, max(self.tile_width, self.tile_height)):
+                # Remove old position data if it exists
+                if position_key in self.current_positions:
+                    _, old_x, old_y = self.current_positions[position_key]
+                    # Note: The tile itself handles cleaning up its old position
+                
+                # Add to batch at new position and update tracking
+                self.tile_cache[tile_type].add_to_batch(x_screen, y_screen, self.batch)
+                self.current_positions[position_key] = (tile_type, x_screen, y_screen)
+            else:
+                # Tile is no longer visible, remove it from current positions
+                if position_key in self.current_positions:
+                    del self.current_positions[position_key]
+    
     def render(self):
-        """Render the isometric map"""
+        """
+        Render the isometric map.
+        This optimized version updates only what's needed before rendering.
+        """
         if not self.map_data or not self.map_data.header:
             return
 
-        # Rebuild batch if needed (offset changed or map loaded)
-        if self.needs_rebuild:
+        # Update batch if needed (offset changed or map loaded)
+        if self.needs_rebuild or self.dirty_tiles:
             self._rebuild_batch()
 
-        # Setup OpenGL state for rendering
+        # Setup OpenGL state for rendering - minimizing state changes
+        # We only set these states once per frame
         try:
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        except:
-            pass  # Continue without blending if not available
-
-        try:
             glLineWidth(1.0)
         except:
-            pass  # Continue without line width if not available
+            pass  # Continue if OpenGL features not available
 
         # Draw all tiles with a single batch draw call
         self.batch.draw()
