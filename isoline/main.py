@@ -7,6 +7,7 @@ Entry point for the isometric vector graphics engine.
 import os
 import sys
 import argparse
+import math
 import pyglet
 from pyglet.gl import *
 from pyglet.window import key, FPSDisplay
@@ -90,6 +91,39 @@ class IsolineApp(pyglet.window.Window):
         if self.keys[key.SPACE]:
             self.center_map()
             
+        # Update tile animations
+        self.renderer.update_animation(dt)
+            
+        # Animation control keys
+        if self.keys[key.A] and not hasattr(self, 'animation_toggle_cooldown'):
+            self.renderer.enable_animation(not self.renderer.animation_enabled)
+            print(f"Animation {'enabled' if self.renderer.animation_enabled else 'disabled'}")
+            self.animation_toggle_cooldown = 0.5  # Cooldown to prevent multiple toggles
+            
+        # Speed controls
+        if self.keys[key.EQUAL] and not hasattr(self, 'speed_change_cooldown'):  # Plus key (=)
+            # Speed up animation (reduce frame time)
+            self.renderer.set_animation_speed(max(0.05, self.renderer.animation_frame_time * 0.8))
+            print(f"Animation speed: {1.0/self.renderer.animation_frame_time:.2f} FPS")
+            self.speed_change_cooldown = 0.3
+            
+        if self.keys[key.MINUS] and not hasattr(self, 'speed_change_cooldown'):
+            # Slow down animation (increase frame time)
+            self.renderer.set_animation_speed(min(2.0, self.renderer.animation_frame_time * 1.2))
+            print(f"Animation speed: {1.0/self.renderer.animation_frame_time:.2f} FPS")
+            self.speed_change_cooldown = 0.3
+            
+        # Handle cooldowns
+        if hasattr(self, 'animation_toggle_cooldown'):
+            self.animation_toggle_cooldown -= dt
+            if self.animation_toggle_cooldown <= 0:
+                delattr(self, 'animation_toggle_cooldown')
+                
+        if hasattr(self, 'speed_change_cooldown'):
+            self.speed_change_cooldown -= dt
+            if self.speed_change_cooldown <= 0:
+                delattr(self, 'speed_change_cooldown')
+            
         # Log FPS every second
         if hasattr(self, 'fps_log_timer'):
             self.fps_log_timer += dt
@@ -133,6 +167,15 @@ class IsolineApp(pyglet.window.Window):
         """Handle key press events"""
         if symbol == key.ESCAPE:
             pyglet.app.exit()
+        elif symbol == key.F1:
+            # Display help
+            print("\nIsoline Controls:")
+            print("  Arrow Keys: Pan the map")
+            print("  Space: Center the map")
+            print("  A: Toggle animation")
+            print("  +/-: Increase/decrease animation speed")
+            print("  F1: Show this help")
+            print("  ESC: Exit\n")
         return pyglet.event.EVENT_HANDLED
 
     def cleanup(self):

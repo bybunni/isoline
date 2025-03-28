@@ -4,19 +4,20 @@ Tile Renderer
 Handles rendering of individual tiles using vector graphics
 in the style of old monochrome green CRTs.
 
-Optimized version with vertex array caching and batch rendering.
+Optimized version with vertex array caching, batch rendering, and animation support.
 """
 
 import random
+import math
 import numpy as np
 import pyglet
 from pyglet import shapes
 from pyglet.gl import *
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any, Optional, Union
 
 
 class VectorTile:
-    """Base class for vector-drawn tiles with optimized rendering"""
+    """Base class for vector-drawn tiles with optimized rendering and animation support"""
 
     def __init__(self, width: int = 100, height: int = 50):
         self.width = width
@@ -35,8 +36,14 @@ class VectorTile:
             (0, 0),
         ]
         
+        # Animation state tracking
+        self.states = [0]  # Default has only a single state (0)
+        self.current_state_index = 0
+        self.animated = False
+        
         # Cache for vertex data (for OpenGL/VBO optimization)
-        self._vertex_data_cache: Optional[Dict[str, Any]] = None
+        # Now organized by state: state_index -> vertex_data
+        self._vertex_data_cache: Dict[int, Dict[str, Any]] = {}
         
         # For faster rendering, we'll use a vertex buffer approach
         # Shapes will still be stored for compatibility
@@ -44,15 +51,29 @@ class VectorTile:
         
         # Vertex groups for efficient rendering
         self.vertex_groups_by_position: Dict[Tuple[float, float], List[pyglet.graphics.vertexdomain.VertexList]] = {}
+        
+        # Track which state is displayed at which position
+        self.state_by_position: Dict[Tuple[float, float], int] = {}
     
-    def _create_vertex_data(self) -> Dict[str, Any]:
+    def _create_vertex_data(self, state: Optional[int] = None) -> Dict[str, Any]:
         """
         Generate and cache vertex data for efficient rendering.
         Returns cached data structure with vertices and colors.
-        This method should be called once and results cached.
+        
+        Args:
+            state: The animation state to generate vertex data for. 
+                  If None, uses the current state.
+        
+        Returns:
+            Dict with vertex data for the requested state
         """
-        if self._vertex_data_cache is not None:
-            return self._vertex_data_cache
+        # Use current state if none specified
+        if state is None:
+            state = self.states[self.current_state_index]
+        
+        # Return from cache if available for this state
+        if state in self._vertex_data_cache:
+            return self._vertex_data_cache[state]
             
         # For outline vertices (lines)
         outline_vertices = []
@@ -66,24 +87,58 @@ class VectorTile:
             outline_colors.extend(self.outline_color * 2)  # Each vertex needs a color
             
         # Get content vertices/colors from subclasses
-        content_data = self._create_content_vertex_data()
+        content_data = self._create_content_vertex_data(state)
         
-        # Cache the data
-        self._vertex_data_cache = {
+        # Cache the data for this state
+        self._vertex_data_cache[state] = {
             'outline_vertices': outline_vertices,
             'outline_colors': outline_colors,
             'content_vertices': content_data.get('vertices', []),
             'content_colors': content_data.get('colors', [])
         }
         
-        return self._vertex_data_cache
+        return self._vertex_data_cache[state]
     
-    def _create_content_vertex_data(self) -> Dict[str, List[float]]:
+    def _create_content_vertex_data(self, state: int = 0) -> Dict[str, List[float]]:
         """
         Generate content vertex data - override in subclasses.
-        Returns a dict with 'vertices' and 'colors' lists.
+        
+        Args:
+            state: The animation state to generate content for
+            
+        Returns:
+            A dict with 'vertices' and 'colors' lists.
         """
         return {'vertices': [], 'colors': []}
+        
+    def set_states(self, num_states: int):
+        """
+        Configure the tile to have multiple animation states.
+        
+        Args:
+            num_states: The number of animation states
+        """
+        if num_states <= 0:
+            raise ValueError("Number of states must be positive")
+            
+        self.states = list(range(num_states))
+        self.animated = num_states > 1
+        # Clear any existing cache
+        self._vertex_data_cache = {}
+        
+    def advance_state(self):
+        """Advance to the next animation state, cycling back to the first if needed"""
+        if not self.animated or not self.states:
+            return
+            
+        # Advance to next state
+        self.current_state_index = (self.current_state_index + 1) % len(self.states)
+        
+    def get_current_state(self) -> int:
+        """Get the current animation state value"""
+        if not self.states:
+            return 0
+        return self.states[self.current_state_index]
 
     def create_shapes_for_batch(self, x: float, y: float, batch: pyglet.graphics.Batch) -> List[shapes.ShapeBase]:
         """
@@ -119,7 +174,9 @@ class VectorTile:
         For Pyglet 2.1.3, this now uses shapes.Line objects added to the batch.
         The batch.draw() method will be called later to render everything.
         """
-        vertex_data = self._create_vertex_data()
+        current_state = self.get_current_state()
+        vertex_data = self._create_vertex_data(current_state)
+        
         # We'll return vertex lists for compatibility, even though we're using shapes now
         vertex_lists = []
         shape_objects = []
@@ -166,6 +223,9 @@ class VectorTile:
         pos_key = (x, y)
         self.shapes_by_position[pos_key] = shape_objects
         
+        # Track which state is at this position
+        self.state_by_position[pos_key] = current_state
+        
         return vertex_lists
     
     def add_to_batch(self, x: float, y: float, batch: pyglet.graphics.Batch):
@@ -207,16 +267,17 @@ class VectorTile:
         self.shapes_by_position.clear()
         
         # Clear the cache
-        self._vertex_data_cache = None
+        self._vertex_data_cache = {}
 
 
 class GrassTile(VectorTile):
     """
     Grass tile with vector graphics representation.
     Optimized version using vertex data caching.
+    Supports animation with swaying grass.
     """
 
-    def __init__(self, width: int = 100, height: int = 50, num_blades: int = 30):
+    def __init__(self, width: int = 100, height: int = 50, num_blades: int = 30, num_states: int = 5):
         self.num_blades = num_blades
         # Random seed ensures same grass pattern for each tile instance
         self.blade_positions = []
@@ -230,21 +291,59 @@ class GrassTile(VectorTile):
             
         # Call parent constructor
         super().__init__(width, height)
+        
+        # Set up animation states
+        self.set_states(num_states)
     
-    def _create_content_vertex_data(self) -> Dict[str, List[float]]:
+    def _create_content_vertex_data(self, state: int = 0) -> Dict[str, List[float]]:
         """
         Generate efficient vertex data for grass blades.
-        This is called once per tile type and cached.
+        Different states create a swaying animation effect.
+        
+        Args:
+            state: The animation state (used to vary blade angles)
+            
+        Returns:
+            Dict with vertices and colors for the specified state
         """
         vertices = []
         colors = []
         
-        # Create grass blade vertices
+        # Determine the sway factor based on animation state
+        # This creates a gentle swaying pattern across animation frames
+        max_sway = 3.0  # Maximum pixel offset for swaying
+        if len(self.states) <= 1:
+            sway_factor = 0
+        else:
+            # Calculate a unique sway factor for each state
+            # Use sine wave to create smooth transitions
+            angle = (state / (len(self.states) - 1)) * 2 * math.pi
+            sway_factor = math.sin(angle) * max_sway
+        
+        # Draw grass blades with varying heights and sway angles
         for blade_x, blade_y, height in self.blade_positions:
-            # Each blade is a line from (x,y) to (x,y+height)
-            vertices.extend([blade_x, blade_y, blade_x, blade_y + height])
-            # Add colors for each vertex
-            colors.extend(self.content_color * 2)  # 2 vertices per blade
+            # Apply a unique sway to each blade based on its position and the current state
+            # Using hash of position ensures consistent sway direction for each blade
+            blade_sway = sway_factor * ((hash(f"{blade_x:.1f}_{blade_y:.1f}") % 100) / 100.0 - 0.5) * 2.0
+            
+            # Each blade is a line with a slight angle varying by state
+            vertices.extend([blade_x, blade_y, blade_x + blade_sway, blade_y + height])
+            
+            # Slightly randomize green shade for visual interest
+            # Make the green slightly brighter in middle animation states for subtle effect
+            green_factor = 1.0
+            if len(self.states) > 1:
+                # Subtle brightness variation based on animation state
+                mid_state = len(self.states) // 2
+                distance_from_mid = abs(state - mid_state)
+                green_factor = 1.0 - (distance_from_mid / (len(self.states) * 2))
+                green_factor = 0.9 + (green_factor * 0.2)  # Limit the effect (0.9-1.1 range)
+                
+            green = min(255, int(204 * green_factor))
+            blade_color = (0, green, 0)
+            
+            # Add color for each vertex in the line
+            colors.extend(blade_color * 2)  # 2 vertices per line
             
         return {
             'vertices': vertices,
@@ -253,20 +352,37 @@ class GrassTile(VectorTile):
     
     def _create_content_shapes(self, x: float, y: float, batch: pyglet.graphics.Batch) -> List[shapes.ShapeBase]:
         """
-        Legacy method for grass blades as vertical lines.
+        Legacy method for grass blades as lines.
         Maintained for compatibility but optimized implementations
         should use the vertex data approach.
+        
+        Note: This does not support animation states as it's a legacy method.
         """
         content_shapes = []
         
-        # Create grass blade shapes
+        # Create grass blade shapes - using current state if available
+        current_state = self.get_current_state()
+        
+        # Determine sway factor for current state
+        max_sway = 3.0
+        if self.animated:
+            angle = (current_state / (len(self.states) - 1)) * 2 * math.pi
+            sway_factor = math.sin(angle) * max_sway
+        else:
+            sway_factor = 0
+        
+        # Create grass blade shapes with potential sway
         for blade_x, blade_y, height in self.blade_positions:
+            # Apply sway if animated
+            blade_sway = 0
+            if self.animated:
+                blade_sway = sway_factor * ((hash(f"{blade_x:.1f}_{blade_y:.1f}") % 100) / 100.0 - 0.5) * 2.0
+                
             # Line constructor parameters: x1, y1, x2, y2, color, batch
             blade = shapes.Line(
                 blade_x + x, blade_y + y, 
-                blade_x + x, blade_y + y + height, 
+                blade_x + x + blade_sway, blade_y + y + height, 
                 color=self.content_color, 
-                thickness=1.5,
                 batch=batch
             )
             content_shapes.append(blade)
@@ -276,7 +392,7 @@ class GrassTile(VectorTile):
 
 def create_tile(tile_type: str, width: int = 100, height: int = 50) -> VectorTile:
     """Factory function to create the appropriate tile type"""
-    if tile_type == "G":  # Grass
-        return GrassTile(width, height)
+    if tile_type == "G" or tile_type == "g":  # Grass (support both upper and lowercase)
+        return GrassTile(width, height, num_states=5)  # Create animated grass by default
     else:
         raise ValueError(f"Unknown tile type: {tile_type}")

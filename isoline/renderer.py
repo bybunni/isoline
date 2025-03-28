@@ -49,6 +49,11 @@ class IsometricRenderer:
         # Track which tiles need updates
         self.needs_rebuild = False
         self.dirty_tiles: Set[Tuple[str, int, int]] = set()  # Layer, x, y
+        
+        # Animation settings
+        self.animation_enabled = True
+        self.animation_frame_time = 0.25  # Seconds between animation frames
+        self.animation_time_elapsed = 0  # Time tracker for animation
 
     def load_map(self, map_path: str) -> bool:
         """
@@ -279,6 +284,38 @@ class IsometricRenderer:
                 if position_key in self.current_positions:
                     del self.current_positions[position_key]
     
+    def update_animation(self, dt: float):
+        """
+        Update tile animations based on elapsed time.
+        
+        Args:
+            dt: Time elapsed since last update in seconds
+        """
+        if not self.animation_enabled:
+            return
+            
+        # Accumulate time
+        self.animation_time_elapsed += dt
+        
+        # Check if we should advance animation frame
+        if self.animation_time_elapsed >= self.animation_frame_time:
+            # Reset timer
+            self.animation_time_elapsed = 0
+            
+            # Advance animation state for all tiles in cache
+            animated_tiles_updated = False
+            for tile_type, tile in self.tile_cache.items():
+                if tile.animated:
+                    tile.advance_state()
+                    animated_tiles_updated = True
+            
+            # If any animated tiles were updated, mark all their positions as dirty
+            if animated_tiles_updated:
+                for pos_key, (tile_type, _, _) in self.current_positions.items():
+                    tile = self.tile_cache.get(tile_type)
+                    if tile and tile.animated:
+                        self.dirty_tiles.add(pos_key)
+    
     def render(self):
         """
         Render the isometric map.
@@ -309,6 +346,24 @@ class IsometricRenderer:
         except:
             pass
 
+    def set_animation_speed(self, frame_time: float):
+        """
+        Set the animation speed by specifying time between frames.
+        
+        Args:
+            frame_time: Time in seconds between animation frames
+        """
+        self.animation_frame_time = max(0.05, frame_time)  # Enforce minimum frame time
+        
+    def enable_animation(self, enabled: bool = True):
+        """
+        Enable or disable animation.
+        
+        Args:
+            enabled: Whether animation should be enabled
+        """
+        self.animation_enabled = enabled
+        
     def cleanup(self):
         """Clean up OpenGL resources"""
         for tile in self.tile_cache.values():
