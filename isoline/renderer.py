@@ -36,19 +36,20 @@ class IsometricRenderer:
         self.x_offset = 0
         self.y_offset = 0
         
-        # Batch for efficient rendering
+        # Batch for efficient rendering - VBOs will be added here
         self.batch = pyglet.graphics.Batch()
         
-        # Track current positions of tiles for efficient updates
+        # Track tile instances associated with grid positions for updates
+        # Maps (layer_name, grid_x, grid_y) -> (tile_type, screen_x, screen_y)
         self.current_positions = {}
         
         # Track visible region for culling
         self.viewport_width = 800  # Default, will be updated on resize
         self.viewport_height = 600  # Default, will be updated on resize
         
-        # Track which tiles need updates
+        # Track which grid positions need updates (VBO recreation/deletion)
         self.needs_rebuild = False
-        self.dirty_tiles: Set[Tuple[str, int, int]] = set()  # Layer, x, y
+        self.dirty_tiles: Set[Tuple[str, int, int]] = set()  # Layer, x, y grid coords
         
         # Animation settings
         self.animation_enabled = True
@@ -76,7 +77,7 @@ class IsometricRenderer:
 
     def _init_tiles(self):
         """Initialize tile cache for the loaded map"""
-        # Clear existing cache and batch
+        # Clear existing cache and ensure all old VBOs are deleted
         self.cleanup()
         
         if not self.map_data:
@@ -85,8 +86,8 @@ class IsometricRenderer:
         # Find all unique tile types in the map
         unique_tiles = set()
         for layer_name, layer_data in self.map_data.layers.items():
-            for row in layer_data.grid:
-                for cell in row:
+            for y, row in enumerate(layer_data.grid):
+                for x, cell in enumerate(row):
                     if cell != ".":  # Skip empty cells
                         unique_tiles.add(cell)
 
@@ -115,18 +116,15 @@ class IsometricRenderer:
         self.x_offset = x
         self.y_offset = y
         
-        # If camera moved significantly, do a full rebuild with culling
-        if abs(x - old_x_offset) > self.viewport_width // 3 or abs(y - old_y_offset) > self.viewport_height // 3:
-            # Clear current positions but DON'T delete shapes - let rebuild handle it
-            self.current_positions.clear()
-            
+        # A significant camera move invalidates all current VBO positions
+        # Mark for full rebuild - cleanup happens in _rebuild_batch
+        if abs(x - old_x_offset) > self.viewport_width // 2 or abs(y - old_y_offset) > self.viewport_height // 2:
             # Force a full rebuild
             self.needs_rebuild = True
         else:
             # For small movements, mark all current positions as dirty for incremental updates
             for pos_key in list(self.current_positions.keys()):
-                # Just mark positions as dirty, don't delete anything here
-                # The _update_dirty_tiles method will handle cleanup properly
+                # Mark grid positions as dirty. _update_dirty_tiles will handle VBO management.
                 self.dirty_tiles.add(pos_key)
                 
     def set_viewport_size(self, width: int, height: int):
@@ -148,17 +146,15 @@ class IsometricRenderer:
             old_batch = self.batch
             self.batch = pyglet.graphics.Batch()
             
-            # Clear tile tracking
-            old_positions = self.current_positions.copy() 
+            # --- VBO Cleanup --- 
+            # Before rebuilding, ensure all VBOs associated with the *old* batch
+            # are deleted from the GPU and tile instances.
+            for tile in self.tile_cache.values():
+                tile.delete() # This clears tile._active_vertex_lists
+            # --- End VBO Cleanup ---
+                
             self.current_positions.clear()
             self.dirty_tiles.clear()
-            
-            # Clean up old positions (helps prevent ghosting)
-            for tile in self.tile_cache.values():
-                # Only clear the shape positions dictionary - don't delete objects
-                # This ensures positions are tracked correctly while preserving shape objects
-                tile.shapes_by_position.clear()
-                tile.vertex_groups_by_position.clear()
             
             # Add all tiles to the batch at their current positions
             for layer_name in self.map_data.header.layers:
@@ -196,7 +192,7 @@ class IsometricRenderer:
             for x in range(width):
                 tile_type = layer.grid[y][x]
                 if tile_type in self.tile_cache:
-                    # Calculate isometric position
+                    # Calculate isometric screen position
                     x_screen = (
                         x_start
                         + (x * self.tile_width // 2)
@@ -210,8 +206,9 @@ class IsometricRenderer:
                     
                     # Only add tiles that are potentially visible (with padding)
                     if self._is_potentially_visible(x_screen, y_screen, padding):
-                        # Add to batch and track position
+                        # Add VBO to batch and track grid position <-> screen position
                         position_key = (layer_name, x, y)
+                        # add_to_batch now handles VBO creation/management internally
                         self.tile_cache[tile_type].add_to_batch(x_screen, y_screen, self.batch)
                         self.current_positions[position_key] = (tile_type, x_screen, y_screen)
 
@@ -230,18 +227,17 @@ class IsometricRenderer:
         
     def _update_dirty_tiles(self):
         """
-        Update only the tiles that have been marked as dirty.
-        Much more efficient than rebuilding the entire batch.
-        Handles shape cleanup properly without being too aggressive.
+        Update only the tiles corresponding to dirty grid positions.
+        Handles deleting old VBOs and adding new ones at updated positions/states.
         """
         if not self.map_data or not self.map_data.header:
             return
             
-        # For each dirty tile, remove it from the batch and re-add at new position
+        # For each dirty grid position, update the corresponding tile's VBO
         for position_key in self.dirty_tiles:
             layer_name, x, y = position_key
             
-            # Get the tile type for this position
+            # Get the tile type and instance for this grid position
             layer = self.map_data.get_layer(layer_name)
             if not layer:
                 continue
@@ -250,37 +246,40 @@ class IsometricRenderer:
             if tile_type not in self.tile_cache:
                 continue
                 
+            tile = self.tile_cache[tile_type]
+
             # Calculate new screen position
-            x_screen = (
+            new_x_screen = (
                 self.x_offset
                 + (x * self.tile_width // 2)
                 - (y * self.tile_width // 2)
             )
-            y_screen = (
+            new_y_screen = (
                 self.y_offset
                 + (x * self.tile_height // 2)
                 + (y * self.tile_height // 2)
             )
             
-            # Clean up the existing shapes for this position specifically
-            # This ensures we don't leave ghost shapes at old positions
+            new_screen_pos_key = (new_x_screen, new_y_screen)
+            
+            # --- VBO Management --- 
+            # Check if there was a VBO at the *old* screen position for this grid position
             if position_key in self.current_positions:
                 old_tile_type, old_x, old_y = self.current_positions[position_key]
-                if old_tile_type in self.tile_cache:
-                    # Only clean up shapes at this specific position
-                    old_pos_key = (old_x, old_y)
-                    if old_pos_key in self.tile_cache[old_tile_type].shapes_by_position:
-                        for shape in self.tile_cache[old_tile_type].shapes_by_position[old_pos_key]:
-                            shape.delete()
-                        self.tile_cache[old_tile_type].shapes_by_position[old_pos_key] = []
+                old_screen_pos_key = (old_x, old_y)
+                # Get the corresponding tile instance (should be the same tile object)
+                old_tile = self.tile_cache.get(old_tile_type)
+                if old_tile:
+                    # Delete the VBO at the *old* screen position
+                    old_tile.delete_vbo_at_position(old_screen_pos_key)
+            # --- End VBO Management ---
             
-            # Only add back if potentially visible
-            if self._is_potentially_visible(x_screen, y_screen, max(self.tile_width, self.tile_height) * 2):
-                # Add to batch at new position and update tracking
-                self.tile_cache[tile_type].add_to_batch(x_screen, y_screen, self.batch)
-                self.current_positions[position_key] = (tile_type, x_screen, y_screen)
+            # Add VBO at the *new* position if potentially visible
+            if self._is_potentially_visible(new_x_screen, new_y_screen, max(self.tile_width, self.tile_height) * 2):
+                tile.add_to_batch(new_x_screen, new_y_screen, self.batch)
+                self.current_positions[position_key] = (tile_type, new_x_screen, new_y_screen)
             else:
-                # Tile is no longer visible, remove it from current positions
+                # Tile is no longer visible, ensure its removed from tracking
                 if position_key in self.current_positions:
                     del self.current_positions[position_key]
     
@@ -310,7 +309,7 @@ class IsometricRenderer:
                     animated_tiles_updated = True
             
             # If any animated tiles were updated, mark all their positions as dirty
-            if animated_tiles_updated:
+            if animated_tiles_updated: # Mark the *grid position* as dirty
                 for pos_key, (tile_type, _, _) in self.current_positions.items():
                     tile = self.tile_cache.get(tile_type)
                     if tile and tile.animated:
@@ -367,7 +366,8 @@ class IsometricRenderer:
     def cleanup(self):
         """Clean up OpenGL resources"""
         for tile in self.tile_cache.values():
-            tile.delete()
+            tile.delete() # Ensure all VBOs are deleted
         self.tile_cache.clear()
         self.current_positions.clear()
+        self.dirty_tiles.clear()
         self.batch = pyglet.graphics.Batch()
