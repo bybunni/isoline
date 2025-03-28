@@ -11,6 +11,7 @@ import random
 import math
 import numpy as np
 import pyglet
+import traceback
 from pyglet import shapes
 from pyglet.gl import *
 from typing import List, Tuple, Dict, Any, Optional, Union
@@ -65,8 +66,8 @@ class VectorTile:
 
         # Define standard attribute names and formats used by this tile type
         self._attribute_formats = {
-            'vertices': {'format': ('f', 2), 'usage': 'static', 'location': 0},
-            'colors': {'format': ('B', 4), 'usage': 'static', 'location': 1}
+            'vertices': {'format': ('f', 2), 'usage': 'static', 'location': 0, 'count': 2, 'instance': False},
+            'colors': {'format': ('B', 4), 'usage': 'static', 'location': 1, 'count': 4, 'instance': False}
         }
         # Use attribute formats directly as domain attributes
         self._domain_attributes = self._attribute_formats
@@ -251,6 +252,7 @@ class VectorTile:
             self.state_by_position[pos_key] = current_state
         except Exception as e:
              print(f"Error adding to batch for {type(self).__name__} at {pos_key}: {e}")
+             print(traceback.format_exc())
              # Attempt to clean up if VBO was partially created or state is inconsistent
              if pos_key in self._active_vertex_lists:
                  self.delete_vbo_at_position(pos_key)
