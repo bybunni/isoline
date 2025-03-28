@@ -21,7 +21,7 @@ class IsometricRenderer:
 
     Uses the 2:1 tile ratio for optimal rendering as specified
     in the SRD.
-    
+
     Performance optimized with:
     - View frustum culling
     - Minimal batch rebuilding
@@ -118,7 +118,10 @@ class IsometricRenderer:
 
         # A significant camera move invalidates all current VBO positions
         # Mark for full rebuild - cleanup happens in _rebuild_batch
-        if abs(x - old_x_offset) > self.viewport_width // 2 or abs(y - old_y_offset) > self.viewport_height // 2:
+        if (
+            abs(x - old_x_offset) > self.viewport_width // 2
+            or abs(y - old_y_offset) > self.viewport_height // 2
+        ):
             # Force a full rebuild
             self.needs_rebuild = True
         else:
@@ -150,7 +153,7 @@ class IsometricRenderer:
             # Before rebuilding, ensure all VBOs associated with the *old* batch
             # are deleted from the GPU and tile instances.
             for tile in self.tile_cache.values():
-                tile.delete() # This clears tile._active_vertex_lists
+                tile.delete()  # This clears tile._active_vertex_lists
             # --- End VBO Cleanup ---
 
             self.current_positions.clear()
@@ -204,25 +207,50 @@ class IsometricRenderer:
                         + (y * self.tile_height // 2)
                     )
 
+                    # --- DEBUG PRINT: Visibility Check ---
+                    is_visible = self._is_potentially_visible(
+                        x_screen, y_screen, padding
+                    )
+                    if x < 2 and y < 2:  # Print only first few tiles
+                        print(
+                            f"Checking visibility for grid ({x},{y}): screen=({x_screen:.1f},{y_screen:.1f}), viewport=({self.viewport_width},{self.viewport_height}), padding={padding:.1f}, visible={is_visible}"
+                        )
+                    # --- END DEBUG ---
+
                     # Only add tiles that are potentially visible (with padding)
-                    if self._is_potentially_visible(x_screen, y_screen, padding):
+                    if is_visible:
+                        # --- DEBUG PRINT: Screen Coordinates (if visible) ---
+                        if x < 2 and y < 2:  # Print only first few tiles per layer
+                            print(
+                                f"Adding tile {tile_type} at grid ({x},{y}) -> screen ({x_screen:.1f},{y_screen:.1f})"
+                            )
+                        # --- END DEBUG ---
+
                         # Add VBO to batch and track grid position <-> screen position
                         position_key = (layer_name, x, y)
                         # add_to_batch now handles VBO creation/management internally
-                        self.tile_cache[tile_type].add_to_batch(x_screen, y_screen, self.batch)
-                        self.current_positions[position_key] = (tile_type, x_screen, y_screen)
+                        self.tile_cache[tile_type].add_to_batch(
+                            x_screen, y_screen, self.batch
+                        )
+                        self.current_positions[position_key] = (
+                            tile_type,
+                            x_screen,
+                            y_screen,
+                        )
 
-    def _is_potentially_visible(self, x_screen: float, y_screen: float, padding: float) -> bool:
+    def _is_potentially_visible(
+        self, x_screen: float, y_screen: float, padding: float
+    ) -> bool:
         """
         Check if a tile at the given screen position is potentially visible.
         Uses viewport size and padding to determine visibility.
         """
         # Simple rectangular bounds check with padding
         return (
-            x_screen + self.tile_width + padding >= 0 and
-            x_screen - padding <= self.viewport_width and
-            y_screen + self.tile_height + padding >= 0 and
-            y_screen - padding <= self.viewport_height
+            x_screen + self.tile_width + padding >= 0
+            and x_screen - padding <= self.viewport_width
+            and y_screen + self.tile_height + padding >= 0
+            and y_screen - padding <= self.viewport_height
         )
 
     def _update_dirty_tiles(self):
@@ -250,9 +278,7 @@ class IsometricRenderer:
 
             # Calculate new screen position
             new_x_screen = (
-                self.x_offset
-                + (x * self.tile_width // 2)
-                - (y * self.tile_width // 2)
+                self.x_offset + (x * self.tile_width // 2) - (y * self.tile_width // 2)
             )
             new_y_screen = (
                 self.y_offset
@@ -275,9 +301,15 @@ class IsometricRenderer:
             # --- End VBO Management ---
 
             # Add VBO at the *new* position if potentially visible
-            if self._is_potentially_visible(new_x_screen, new_y_screen, max(self.tile_width, self.tile_height) * 2):
+            if self._is_potentially_visible(
+                new_x_screen, new_y_screen, max(self.tile_width, self.tile_height) * 2
+            ):
                 tile.add_to_batch(new_x_screen, new_y_screen, self.batch)
-                self.current_positions[position_key] = (tile_type, new_x_screen, new_y_screen)
+                self.current_positions[position_key] = (
+                    tile_type,
+                    new_x_screen,
+                    new_y_screen,
+                )
             else:
                 # Tile is no longer visible, ensure its removed from tracking
                 if position_key in self.current_positions:
@@ -286,7 +318,7 @@ class IsometricRenderer:
     def update_animation(self, dt: float):
         """
         Update tile animations based on elapsed time.
-        
+
         Args:
             dt: Time elapsed since last update in seconds
         """
@@ -309,7 +341,7 @@ class IsometricRenderer:
                     animated_tiles_updated = True
 
             # If any animated tiles were updated, mark all their positions as dirty
-            if animated_tiles_updated: # Mark the *grid position* as dirty
+            if animated_tiles_updated:  # Mark the *grid position* as dirty
                 for pos_key, (tile_type, _, _) in self.current_positions.items():
                     tile = self.tile_cache.get(tile_type)
                     if tile and tile.animated:
@@ -330,9 +362,13 @@ class IsometricRenderer:
         # Setup OpenGL state for rendering - minimizing state changes
         # We only set these states once per frame
         try:
-            glEnable(GL_BLEND)
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            glLineWidth(3.0)
+            # Temporarily comment out state changes for debugging
+            # glEnable(GL_BLEND)
+            # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            # glLineWidth(3.0) # Keep line width thicker for visibility if it works
+            # Set back to 1.0 as 3.0 caused GL_INVALID_VALUE
+            glLineWidth(1.0)
+            pass  # Keep the try/except structure
         except:
             pass  # Continue if OpenGL features not available
 
@@ -341,14 +377,16 @@ class IsometricRenderer:
 
         # Reset OpenGL state
         try:
-            glDisable(GL_BLEND)
+            # Temporarily comment out state changes for debugging
+            # glDisable(GL_BLEND)
+            pass  # Keep the try/except structure
         except:
             pass
 
     def set_animation_speed(self, frame_time: float):
         """
         Set the animation speed by specifying time between frames.
-        
+
         Args:
             frame_time: Time in seconds between animation frames
         """
@@ -357,7 +395,7 @@ class IsometricRenderer:
     def enable_animation(self, enabled: bool = True):
         """
         Enable or disable animation.
-        
+
         Args:
             enabled: Whether animation should be enabled
         """
@@ -366,7 +404,7 @@ class IsometricRenderer:
     def cleanup(self):
         """Clean up OpenGL resources"""
         for tile in self.tile_cache.values():
-            tile.delete() # Ensure all VBOs are deleted
+            tile.delete()  # Ensure all VBOs are deleted
         self.tile_cache.clear()
         self.current_positions.clear()
         self.dirty_tiles.clear()
