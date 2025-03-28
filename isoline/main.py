@@ -22,15 +22,25 @@ class IsolineApp(pyglet.window.Window):
     def __init__(self, width=800, height=600, title="Isoline Engine"):
         super().__init__(width, height, title, resizable=True)
 
-        # Setup OpenGL
+        # Setup OpenGL with minimal state setup
         glClearColor(0.05, 0.05, 0.05, 1.0)  # Dark background
-
+        
+        # Enable blending for transparency
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        
         # Enable line smoothing if available
         try:
             glEnable(GL_LINE_SMOOTH)
             glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
         except:
             print("Line smoothing not available, continuing without it")
+            
+        # Set line width for visible lines (use a valid width)
+        try:
+            glLineWidth(1.0)  # Use 1.0 as a safe default
+        except Exception as e:
+            print(f"Error setting line width: {e}")
 
         # Create renderer
         self.renderer = IsometricRenderer()
@@ -140,8 +150,7 @@ class IsolineApp(pyglet.window.Window):
         """Render the scene"""
         self.clear()
 
-        # Pyglet automatically sets up a 2D projection for us
-        # Just render the map
+        # Render the map
         self.renderer.render()
         
         # Draw the FPS counter

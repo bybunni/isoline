@@ -69,22 +69,24 @@ class VectorTile:
         # Track which state is displayed at which position
         self.state_by_position: Dict[Tuple[float, float], int] = {}
 
-        # Define standard attribute formats using conventional pyglet format strings as keys
-        # AND include the 'format' key as required by VertexDomain constructor
+        # Define standard attribute formats using traditional pyglet attribute names
+        # These will match the fixed pipeline attribute names
         self._domain_attributes = {
-            "v2f": {
+            "v2f": {  # Use Pyglet's standard 'v2f' attribute name
                 "format": ("f", 2),  # 2 Floats
-                "usage": "static",
-                "location": 0,  # Ensure this matches shader if custom shaders are used
+                "usage": "static",  # Static for fixed function pipeline
+                "location": 0,  # Position attribute location
                 "count": 2,  # Explicitly state component count
                 "instance": False,
+                "normalized": False,
             },
-            "c4B": {
+            "c4B": {  # Use Pyglet's standard 'c4B' attribute name
                 "format": ("B", 4),  # 4 Bytes (unsigned char)
-                "usage": "static",
-                "location": 1,  # Ensure this matches shader if custom shaders are used
+                "usage": "static",  # Static for fixed function pipeline
+                "location": 1,  # Color attribute location
                 "count": 4,  # Explicitly state component count
                 "instance": False,
+                "normalized": True,  # Normalize color values to 0-1 range
             },
         }
 
@@ -268,31 +270,72 @@ class VectorTile:
         # Add the translated vertices and colors to the batch
         # GL_LINES draws lines between pairs of vertices (v0-v1, v2-v3, etc.)
         try:
-            # Get the appropriate domain from the batch using the defined attributes
-            domain = batch.get_domain(
-                indexed=False,
-                instanced=False,
-                mode=GL_LINES,
-                group=None,  # Use default group
-                attributes=self._domain_attributes,  # Pass the dictionary
-            )
-
-            # Create the vertex list within the obtained domain
-            vertex_list = domain.create(num_vertices)
-
-            # Populate the vertex list attributes using direct assignment
             colors_bytes = bytes(colors)
+            
             # --- DEBUG PRINT ---
             print(
-                f"Assigning data for state {current_state} at {pos_key}: Vertices ({len(translated_vertices)} floats): {translated_vertices[:12]}..., Colors ({len(colors_bytes)} bytes): {colors_bytes[:16]}..."
+                f"Adding to batch: {type(self).__name__} at {pos_key} - {num_vertices} vertices"
             )
             # --- END DEBUG ---
-            vertex_list.v2f = translated_vertices
-            vertex_list.c4B = colors_bytes
-
+            
+            # Create a direct rendering approach using pyglet's modern VBO system
+            # Manual construction of a vertex list to bypass missing batch.add() method
+            
+            # 1. Create a direct rendering approach using OpenGL
+            vertex_array = (GLfloat * len(translated_vertices))(*translated_vertices)
+            color_array = (GLubyte * len(colors_bytes))(*colors_bytes)
+            
+            # 2. Create a wrapper class to handle the buffers and rendering correctly
+            class DirectVertexList:
+                def __init__(self, count, mode, position_data, color_data, group):
+                    self.count = count
+                    self.mode = mode
+                    self.position_data = position_data
+                    self.color_data = color_data
+                    self.group = group
+                    self.parent = None  # For compatibility with batch system
+                
+                def draw(self):
+                    # Set rendering state
+                    glEnableClientState(GL_VERTEX_ARRAY)
+                    glEnableClientState(GL_COLOR_ARRAY)
+                    
+                    # Set up the arrays
+                    glVertexPointer(2, GL_FLOAT, 0, self.position_data)
+                    glColorPointer(4, GL_UNSIGNED_BYTE, 0, self.color_data)
+                    
+                    # Draw the primitives
+                    glDrawArrays(self.mode, 0, self.count)
+                    
+                    # Clean up state
+                    glDisableClientState(GL_COLOR_ARRAY)
+                    glDisableClientState(GL_VERTEX_ARRAY)
+                
+                def delete(self):
+                    # Nothing to do for our simple implementation
+                    pass
+            
+            # Create our custom vertex list
+            vertex_list = DirectVertexList(
+                num_vertices,
+                GL_LINES,
+                vertex_array,
+                color_array,
+                _default_group
+            )
+            
             # Store the reference to the new vertex list
             self._active_vertex_lists[pos_key] = vertex_list
             self.state_by_position[pos_key] = current_state
+            
+            # Add to the batch if it has a custom_vertex_lists attribute
+            if hasattr(batch, 'custom_vertex_lists'):
+                batch.custom_vertex_lists.append(vertex_list)
+            
+            # --- DEBUG PRINT ---
+            print(f"Successfully added {type(self).__name__} at {pos_key}")
+            # --- END DEBUG ---
+            
         except Exception as e:
             print(f"Error adding to batch for {type(self).__name__} at {pos_key}: {e}")
             print(traceback.format_exc())
