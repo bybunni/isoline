@@ -15,6 +15,12 @@ from pyglet import shapes
 from pyglet.gl import *
 from typing import List, Tuple, Dict, Any, Optional, Union
 
+# --- Configuration ---
+TILE_WIDTH = 100
+TILE_HEIGHT = 50
+
+# Default rendering group if none is specified
+_default_group = pyglet.graphics.Group()
 
 class VectorTile:
     """Base class for vector-drawn tiles with optimized rendering and animation support"""
@@ -229,17 +235,16 @@ class VectorTile:
                 indexed=False,         # Not using indexed drawing
                 instanced=False,       # Not using instanced drawing
                 mode=GL_LINES,         # Drawing mode
-                group=None,            # No specific group (can be optimized later if needed)
+                group=_default_group,  # Use the default group
                 attributes=self._domain_attributes # Vertex layout
             )
             
-            # Create the vertex list within the obtained domain, providing the actual data
+            # Create the vertex list within the obtained domain, passing data via keyword args
+            colors_bytes = bytes(colors) # Convert color list to bytes
             vertex_list = domain.vertex_list(
                 num_vertices,
-                {
-                    'vertices': translated_vertices,
-                    'colors': colors
-                }
+                vertices=translated_vertices, # Use keyword arg 'vertices'
+                colors=colors_bytes           # Use keyword arg 'colors' with bytes data
             )
             # Store the reference to the new vertex list
             self._active_vertex_lists[pos_key] = vertex_list
