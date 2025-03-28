@@ -65,11 +65,11 @@ class VectorTile:
 
         # Define standard attribute names and formats used by this tile type
         self._attribute_formats = {
-            'vertices': 'v2f',
-            'colors': 'c4B'
+            'vertices': {'format': ('f', 2), 'usage': 'static'},
+            'colors': {'format': ('B', 4), 'usage': 'static'}
         }
-        # Pre-calculate the domain attribute definition string
-        self._domain_attributes = {name: f'{fmt}/static' for name, fmt in self._attribute_formats.items()}
+        # Use attribute formats directly as domain attributes
+        self._domain_attributes = self._attribute_formats
 
     def _create_vertex_data(self, state: Optional[int] = None) -> Dict[str, List[float]]:
         """
