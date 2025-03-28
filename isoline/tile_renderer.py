@@ -142,36 +142,6 @@ class VectorTile:
             return 0
         return self.states[self.current_state_index]
 
-    def create_shapes_for_batch(
-        self, x: float, y: float, batch: pyglet.graphics.Batch
-    ) -> List[shapes.ShapeBase]:
-        """
-        Legacy method that creates shapes for the tile at given position and adds to batch.
-        Maintained for compatibility but optimized implementations should use add_vertex_lists_to_batch.
-        """
-        tile_shapes = []
-
-        # Create outline shapes
-        for i in range(len(self.outline_points) - 1):
-            x1, y1 = self.outline_points[i]
-            x2, y2 = self.outline_points[i + 1]
-            line = shapes.Line(
-                x1 + x, y1 + y, x2 + x, y2 + y, color=self.outline_color, batch=batch
-            )
-            tile_shapes.append(line)
-
-        # Create content shapes (implemented by subclasses)
-        content_shapes = self._create_content_shapes(x, y, batch)
-        tile_shapes.extend(content_shapes)
-
-        return tile_shapes
-
-    def _create_content_shapes(
-        self, x: float, y: float, batch: pyglet.graphics.Batch
-    ) -> List[shapes.ShapeBase]:
-        """Generate content shapes for the tile - override in subclasses"""
-        return []
-
     def add_shapes_to_batch(
         self, x: float, y: float, batch: pyglet.graphics.Batch
     ) -> List[shapes.ShapeBase]:
@@ -378,53 +348,6 @@ class GrassTile(VectorTile):
             colors.extend(blade_color * 2)  # 2 vertices per line
 
         return {"vertices": vertices, "colors": colors}
-
-    def _create_content_shapes(
-        self, x: float, y: float, batch: pyglet.graphics.Batch
-    ) -> List[shapes.ShapeBase]:
-        """
-        Legacy method for grass blades as lines.
-        Maintained for compatibility but optimized implementations
-        should use the vertex data approach.
-
-        Note: This does not support animation states as it's a legacy method.
-        """
-        content_shapes = []
-
-        # Create grass blade shapes - using current state if available
-        current_state = self.get_current_state()
-
-        # Determine sway factor for current state
-        max_sway = 3.0
-        if self.animated:
-            angle = (current_state / (len(self.states) - 1)) * 2 * math.pi
-            sway_factor = math.sin(angle) * max_sway
-        else:
-            sway_factor = 0
-
-        # Create grass blade shapes with potential sway
-        for blade_x, blade_y, height in self.blade_positions:
-            # Apply sway if animated
-            blade_sway = 0
-            if self.animated:
-                blade_sway = (
-                    sway_factor
-                    * ((hash(f"{blade_x:.1f}_{blade_y:.1f}") % 100) / 100.0 - 0.5)
-                    * 2.0
-                )
-
-            # Line constructor parameters: x1, y1, x2, y2, color, batch
-            blade = shapes.Line(
-                blade_x + x,
-                blade_y + y,
-                blade_x + x + blade_sway,
-                blade_y + y + height,
-                color=self.content_color,
-                batch=batch,
-            )
-            content_shapes.append(blade)
-
-        return content_shapes
 
 
 def create_tile(tile_type: str, width: int = 100, height: int = 50) -> VectorTile:
