@@ -69,25 +69,24 @@ class VectorTile:
         # Track which state is displayed at which position
         self.state_by_position: Dict[Tuple[float, float], int] = {}
 
-        # Define standard attribute names and formats used by this tile type
-        self._attribute_formats = {
-            "vertices": {
-                "format": ("f", 2),
+        # Define standard attribute formats using conventional pyglet format strings as keys
+        # AND include the 'format' key as required by VertexDomain constructor
+        self._domain_attributes = {
+            "v2f": {
+                "format": ("f", 2),  # 2 Floats
                 "usage": "static",
-                "location": 0,
-                "count": 2,
+                "location": 0,  # Ensure this matches shader if custom shaders are used
+                "count": 2,  # Explicitly state component count
                 "instance": False,
             },
-            "colors": {
-                "format": ("B", 4),
+            "c4B": {
+                "format": ("B", 4),  # 4 Bytes (unsigned char)
                 "usage": "static",
-                "location": 1,
-                "count": 4,
+                "location": 1,  # Ensure this matches shader if custom shaders are used
+                "count": 4,  # Explicitly state component count
                 "instance": False,
             },
         }
-        # Use attribute formats directly as domain attributes
-        self._domain_attributes = self._attribute_formats
 
     def _create_vertex_data(
         self, state: Optional[int] = None
@@ -129,16 +128,21 @@ class VectorTile:
         content_vertices = content_data.get("vertices", [])
         content_colors = content_data.get("colors", [])
 
-        # Check consistency
-        if len(content_vertices) % 2 != 0:
+        # Correct check: Ensure we have pairs of coordinates for GL_LINES
+        num_coords = len(content_vertices)
+        if num_coords % 4 != 0:  # Each line needs 2 vertices (x,y) -> 4 coords
             print(
-                f"Warning: Odd number of content vertex coordinates for state {state} in {type(self).__name__}"
+                f"Warning: Content vertex coordinate count ({num_coords}) is not a multiple of 4 for GL_LINES in state {state} in {type(self).__name__}. Truncating."
             )
-            # Optionally truncate or handle error
-            content_vertices = content_vertices[: len(content_vertices) // 2 * 2]
+            # Truncate to the largest multiple of 4
+            num_coords = (num_coords // 4) * 4
+            content_vertices = content_vertices[:num_coords]
+            # Also truncate colors if necessary, though the later check handles mismatch
 
-        num_content_verts_expected = len(content_vertices) // 2
-        num_content_colors_components_expected = num_content_verts_expected * 4  # RGBA
+        num_content_verts_expected = num_coords // 2  # Number of vertices from content
+        num_content_colors_components_expected = (
+            num_content_verts_expected * 4
+        )  # RGBA per vertex
 
         if len(content_colors) != num_content_colors_components_expected:
             print(
@@ -264,22 +268,27 @@ class VectorTile:
         # Add the translated vertices and colors to the batch
         # GL_LINES draws lines between pairs of vertices (v0-v1, v2-v3, etc.)
         try:
-            # Get the appropriate domain from the batch for our drawing mode and attributes
+            # Get the appropriate domain from the batch using the defined attributes
             domain = batch.get_domain(
-                indexed=False,  # Not using indexed drawing
-                instanced=False,  # Not using instanced drawing
-                mode=GL_LINES,  # Drawing mode
-                group=_default_group,  # Use the default group
-                attributes=self._domain_attributes,  # Vertex layout
+                indexed=False,
+                instanced=False,
+                mode=GL_LINES,
+                group=None,  # Use default group
+                attributes=self._domain_attributes,  # Pass the dictionary
             )
 
             # Create the vertex list within the obtained domain
             vertex_list = domain.create(num_vertices)
 
-            # Populate the vertex list attributes
-            colors_bytes = bytes(colors)  # Convert color list to bytes
-            vertex_list.vertices = translated_vertices
-            vertex_list.colors = colors_bytes
+            # Populate the vertex list attributes using direct assignment
+            colors_bytes = bytes(colors)
+            # --- DEBUG PRINT ---
+            print(
+                f"Assigning data for state {current_state} at {pos_key}: Vertices ({len(translated_vertices)} floats): {translated_vertices[:12]}..., Colors ({len(colors_bytes)} bytes): {colors_bytes[:16]}..."
+            )
+            # --- END DEBUG ---
+            vertex_list.v2f = translated_vertices
+            vertex_list.c4B = colors_bytes
 
             # Store the reference to the new vertex list
             self._active_vertex_lists[pos_key] = vertex_list
@@ -294,6 +303,9 @@ class VectorTile:
     def delete_vbo_at_position(self, pos_key: Tuple[float, float]):
         """Safely delete the VertexList associated with a specific position."""
         if pos_key in self._active_vertex_lists:
+            # --- DEBUG PRINT ---
+            print(f"Deleting VBO for {type(self).__name__} at position {pos_key}")
+            # --- END DEBUG ---
             try:
                 self._active_vertex_lists[pos_key].delete()
             except Exception as e:
@@ -306,6 +318,11 @@ class VectorTile:
     def delete(self):
         """Clean up all active VertexLists associated with this tile instance."""
         # Delete all vertex lists managed by this tile instance
+        # --- DEBUG PRINT ---
+        print(
+            f"Running {type(self).__name__}.delete() - Deleting {len(self._active_vertex_lists)} active VBOs"
+        )
+        # --- END DEBUG ---
         for vlist in list(self._active_vertex_lists.values()):  # Iterate over a copy
             try:
                 vlist.delete()
