@@ -1,2 +1,3 @@
 - you need to activate the .venv the first time you use it
 - we use uv for dependency and virtual environment management
+- we're using pyglet 2.1.3
