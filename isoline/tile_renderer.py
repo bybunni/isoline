@@ -116,26 +116,57 @@ class VectorTile:
     def add_vertex_lists_to_batch(self, x: float, y: float, batch: pyglet.graphics.Batch) -> List[pyglet.graphics.vertexdomain.VertexList]:
         """
         Add this tile to a rendering batch using efficient vertex lists.
-        This is the preferred method for optimized rendering.
-        Updated for Pyglet 2.1.3 API.
+        For Pyglet 2.1.3, this now uses shapes.Line objects added to the batch.
+        The batch.draw() method will be called later to render everything.
         """
         vertex_data = self._create_vertex_data()
+        # We'll return vertex lists for compatibility, even though we're using shapes now
         vertex_lists = []
+        shape_objects = []
         
-        # Translate vertices to position
-        outline_vertices = []
-        for i in range(0, len(vertex_data['outline_vertices']), 2):
-            vx = vertex_data['outline_vertices'][i] + x
-            vy = vertex_data['outline_vertices'][i+1] + y
-            outline_vertices.extend([vx, vy])
+        # Process outline points - create Line objects for each segment
+        for i in range(len(self.outline_points) - 1):
+            x1, y1 = self.outline_points[i]
+            x2, y2 = self.outline_points[i + 1]
+            line = shapes.Line(
+                x1 + x, y1 + y, x2 + x, y2 + y, 
+                color=self.outline_color, 
+                batch=batch
+            )
+            shape_objects.append(line)
+            
+        # Process content vertices - create Line objects for content vertex data
+        if vertex_data['content_vertices']:
+            content_vertices = []
+            content_colors = vertex_data['content_colors']
+            
+            # Extract and transform content vertices
+            for i in range(0, len(vertex_data['content_vertices']), 2):
+                vx = vertex_data['content_vertices'][i] + x
+                vy = vertex_data['content_vertices'][i+1] + y
+                content_vertices.append((vx, vy))
+            
+            # Create Line objects for content
+            for i in range(0, len(content_vertices) - 1, 2):
+                if i + 1 < len(content_vertices):  # Ensure we have a pair of points
+                    x1, y1 = content_vertices[i]
+                    x2, y2 = content_vertices[i + 1]
+                    
+                    # Get the color for this line - use content_color if color data not available
+                    color = self.content_color
+                    if i//2 * 3 + 2 < len(content_colors):
+                        color = (content_colors[i//2 * 3], 
+                                content_colors[i//2 * 3 + 1], 
+                                content_colors[i//2 * 3 + 2])
+                    
+                    line = shapes.Line(x1, y1, x2, y2, color=color, batch=batch)
+                    shape_objects.append(line)
         
-        # Store the shapes in the shapes_by_position dict
+        # Store the shapes in the shapes_by_position dict for later cleanup
         pos_key = (x, y)
-        self.shapes_by_position[pos_key] = shapes
+        self.shapes_by_position[pos_key] = shape_objects
         
-        # Return an empty list since we're now using shapes instead of vertex lists
-        # This is a compatibility layer to make things work with Pyglet 2.1.3
-        return []
+        return vertex_lists
     
     def add_to_batch(self, x: float, y: float, batch: pyglet.graphics.Batch):
         """
