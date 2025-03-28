@@ -171,23 +171,24 @@ class VectorTile:
     def add_to_batch(self, x: float, y: float, batch: pyglet.graphics.Batch):
         """
         Add this tile to a rendering batch at the specified position.
-        This version uses optimized vertex lists instead of individual shapes.
+        This version uses shapes added to batches for Pyglet 2.1.3 compatibility.
         """
         # Use tuple of position as a key
         pos_key = (x, y)
         
-        # Clean up existing vertex lists at this position
+        # Clean up existing vertex lists if any
         if pos_key in self.vertex_groups_by_position:
             for vlist in self.vertex_groups_by_position[pos_key]:
                 vlist.delete()
+            self.vertex_groups_by_position[pos_key] = []
         
-        # Also clean up legacy shapes if they exist
+        # Clean up existing shapes at this position
         if pos_key in self.shapes_by_position:
             for shape in self.shapes_by_position[pos_key]:
                 shape.delete()
             self.shapes_by_position[pos_key] = []
         
-        # Create vertex lists for this position and add to batch
+        # Create shapes and vertex lists for this position and add to batch
         vertex_lists = self.add_vertex_lists_to_batch(x, y, batch)
         self.vertex_groups_by_position[pos_key] = vertex_lists
     
@@ -198,6 +199,12 @@ class VectorTile:
             for vlist in vlists:
                 vlist.delete()
         self.vertex_groups_by_position.clear()
+        
+        # Delete all shapes
+        for shapes_list in self.shapes_by_position.values():
+            for shape in shapes_list:
+                shape.delete()
+        self.shapes_by_position.clear()
         
         # Clear the cache
         self._vertex_data_cache = None

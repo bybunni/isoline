@@ -97,7 +97,7 @@ class IsometricRenderer:
     def set_offset(self, x: int, y: int):
         """
         Set the rendering offset for the map.
-        This optimized version marks all current tiles as dirty instead of forcing a full rebuild.
+        This optimized version handles both large and small camera movements appropriately.
         """
         if x == self.x_offset and y == self.y_offset:
             return
@@ -112,10 +112,16 @@ class IsometricRenderer:
         
         # If camera moved significantly, do a full rebuild with culling
         if abs(x - old_x_offset) > self.viewport_width // 3 or abs(y - old_y_offset) > self.viewport_height // 3:
+            # Clear current positions but DON'T delete shapes - let rebuild handle it
+            self.current_positions.clear()
+            
+            # Force a full rebuild
             self.needs_rebuild = True
         else:
-            # For small movements, mark all current positions as dirty instead of full rebuild
+            # For small movements, mark all current positions as dirty for incremental updates
             for pos_key in list(self.current_positions.keys()):
+                # Just mark positions as dirty, don't delete anything here
+                # The _update_dirty_tiles method will handle cleanup properly
                 self.dirty_tiles.add(pos_key)
                 
     def set_viewport_size(self, width: int, height: int):
@@ -133,10 +139,21 @@ class IsometricRenderer:
             return
             
         if self.needs_rebuild:
-            # Full rebuild required
+            # Create a new batch
+            old_batch = self.batch
             self.batch = pyglet.graphics.Batch()
+            
+            # Clear tile tracking
+            old_positions = self.current_positions.copy() 
             self.current_positions.clear()
             self.dirty_tiles.clear()
+            
+            # Clean up old positions (helps prevent ghosting)
+            for tile in self.tile_cache.values():
+                # Only clear the shape positions dictionary - don't delete objects
+                # This ensures positions are tracked correctly while preserving shape objects
+                tile.shapes_by_position.clear()
+                tile.vertex_groups_by_position.clear()
             
             # Add all tiles to the batch at their current positions
             for layer_name in self.map_data.header.layers:
@@ -210,6 +227,7 @@ class IsometricRenderer:
         """
         Update only the tiles that have been marked as dirty.
         Much more efficient than rebuilding the entire batch.
+        Handles shape cleanup properly without being too aggressive.
         """
         if not self.map_data or not self.map_data.header:
             return
@@ -239,13 +257,20 @@ class IsometricRenderer:
                 + (y * self.tile_height // 2)
             )
             
-            # Only update if potentially visible
-            if self._is_potentially_visible(x_screen, y_screen, max(self.tile_width, self.tile_height)):
-                # Remove old position data if it exists
-                if position_key in self.current_positions:
-                    _, old_x, old_y = self.current_positions[position_key]
-                    # Note: The tile itself handles cleaning up its old position
-                
+            # Clean up the existing shapes for this position specifically
+            # This ensures we don't leave ghost shapes at old positions
+            if position_key in self.current_positions:
+                old_tile_type, old_x, old_y = self.current_positions[position_key]
+                if old_tile_type in self.tile_cache:
+                    # Only clean up shapes at this specific position
+                    old_pos_key = (old_x, old_y)
+                    if old_pos_key in self.tile_cache[old_tile_type].shapes_by_position:
+                        for shape in self.tile_cache[old_tile_type].shapes_by_position[old_pos_key]:
+                            shape.delete()
+                        self.tile_cache[old_tile_type].shapes_by_position[old_pos_key] = []
+            
+            # Only add back if potentially visible
+            if self._is_potentially_visible(x_screen, y_screen, max(self.tile_width, self.tile_height) * 2):
                 # Add to batch at new position and update tracking
                 self.tile_cache[tile_type].add_to_batch(x_screen, y_screen, self.batch)
                 self.current_positions[position_key] = (tile_type, x_screen, y_screen)
