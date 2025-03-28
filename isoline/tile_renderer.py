@@ -31,9 +31,9 @@ class VectorTile:
         self.width = width
         self.height = height
 
-        # Use bright green colors for visibility (classic terminal look)
-        self.outline_color = (0, 255, 0, 255)  # Bright green
-        self.content_color = (0, 255, 0, 255)  # Bright green
+        # Use bright white colors for debugging visibility
+        self.outline_color = (255, 255, 255, 255)  # Bright white
+        self.content_color = (255, 255, 255, 255)  # Bright white
 
         # Create outline points (relative to 0,0)
         # Adjusted for pyglet's coordinate system (bottom-left origin)
@@ -271,20 +271,20 @@ class VectorTile:
         # GL_LINES draws lines between pairs of vertices (v0-v1, v2-v3, etc.)
         try:
             colors_bytes = bytes(colors)
-            
+
             # --- DEBUG PRINT ---
             print(
                 f"Adding to batch: {type(self).__name__} at {pos_key} - {num_vertices} vertices"
             )
             # --- END DEBUG ---
-            
+
             # Create a direct rendering approach using pyglet's modern VBO system
             # Manual construction of a vertex list to bypass missing batch.add() method
-            
+
             # 1. Create a direct rendering approach using OpenGL
             vertex_array = (GLfloat * len(translated_vertices))(*translated_vertices)
             color_array = (GLubyte * len(colors_bytes))(*colors_bytes)
-            
+
             # 2. Create a wrapper class to handle the buffers and rendering correctly
             class DirectVertexList:
                 def __init__(self, count, mode, position_data, color_data, group):
@@ -294,18 +294,20 @@ class VectorTile:
                     self.color_data = color_data
                     self.group = group
                     self.parent = None  # For compatibility with batch system
-                
+
                 def draw(self):
                     # Use immediate mode since we're having compatibility issues
                     # with the client array interface in this version of Pyglet
-                    
+
                     # Convert position data to Python list for iteration
-                    positions = [self.position_data[i] for i in range(len(self.position_data))]
+                    positions = [
+                        self.position_data[i] for i in range(len(self.position_data))
+                    ]
                     colors = [self.color_data[i] for i in range(len(self.color_data))]
-                    
+
                     # Draw lines using immediate mode (old-school OpenGL)
                     glBegin(self.mode)
-                    
+
                     for i in range(0, self.count):
                         # Set color for the vertex
                         idx = i * 4  # 4 components per color (RGBA)
@@ -315,41 +317,37 @@ class VectorTile:
                             b = colors[idx + 2] / 255.0
                             a = colors[idx + 3] / 255.0
                             glColor4f(r, g, b, a)
-                        
+
                         # Set position for the vertex
                         pos_idx = i * 2  # 2 components per position (x, y)
                         if pos_idx < len(positions):
                             x = positions[pos_idx]
                             y = positions[pos_idx + 1]
                             glVertex2f(x, y)
-                    
+
                     glEnd()
-                
+
                 def delete(self):
                     # Nothing to do for our simple implementation
                     pass
-            
+
             # Create our custom vertex list
             vertex_list = DirectVertexList(
-                num_vertices,
-                GL_LINES,
-                vertex_array,
-                color_array,
-                _default_group
+                num_vertices, GL_LINES, vertex_array, color_array, _default_group
             )
-            
+
             # Store the reference to the new vertex list
             self._active_vertex_lists[pos_key] = vertex_list
             self.state_by_position[pos_key] = current_state
-            
+
             # Add to the batch if it has a custom_vertex_lists attribute
-            if hasattr(batch, 'custom_vertex_lists'):
+            if hasattr(batch, "custom_vertex_lists"):
                 batch.custom_vertex_lists.append(vertex_list)
-            
+
             # --- DEBUG PRINT ---
             print(f"Successfully added {type(self).__name__} at {pos_key}")
             # --- END DEBUG ---
-            
+
         except Exception as e:
             print(f"Error adding to batch for {type(self).__name__} at {pos_key}: {e}")
             print(traceback.format_exc())

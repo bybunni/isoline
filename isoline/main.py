@@ -30,15 +30,17 @@ class IsolineApp(pyglet.window.Window):
         # Skip the projection matrix setup - we'll use pyglet's defaults
 
         # Enable blending for transparency
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Temporarily disable for debugging
+        # glEnable(GL_BLEND)
+        # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         # Enable line smoothing if available
-        try:
-            glEnable(GL_LINE_SMOOTH)
-            glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
-        except:
-            print("Line smoothing not available, continuing without it")
+        # Temporarily disable for debugging
+        # try:
+        #     glEnable(GL_LINE_SMOOTH)
+        #     glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
+        # except:
+        #     print("Line smoothing not available, continuing without it")
 
         # Set line width for visible lines (use a valid width)
         try:
