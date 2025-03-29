@@ -1,2 +1,2 @@
-- activate the python environment with `source .venv/bin/activate`
-- install the module with `uv pip install -e .`
+- you need to activate the .venv the first time you use it
+- we use uv for dependency and virtual environment management
