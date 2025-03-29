@@ -322,8 +322,8 @@ class GrassTile(VectorTile):
 
         # Pre-generate blade positions
         for _ in range(self.num_blades):
-            x = random.uniform(0.1, 0.9) * width
-            y = random.uniform(0.1, 0.9) * height
+            x = random.uniform(0.25, 0.75) * width
+            y = random.uniform(0.25, 0.75) * height
             height_blade = random.uniform(5, 15)  # Blade height
             self.blade_positions.append((x, y, height_blade))
 
@@ -360,34 +360,42 @@ class GrassTile(VectorTile):
 
         # Draw grass blades with varying heights and sway angles
         for blade_x, blade_y, height in self.blade_positions:
-            # Apply a unique sway to each blade based on its position and the current state
-            # Using hash of position ensures consistent sway direction for each blade
+            # Clamp the grass blade root to be within tile boundaries
+            base_x = max(0, min(blade_x, self.width))
+            base_y = max(0, min(blade_y, self.height))
+
+            # Apply a unique sway to each blade based on its original position and the current state
+            # Using hash of original position ensures consistent sway direction for each blade
             blade_sway = (
                 sway_factor
-                * ((hash(f"{blade_x:.1f}_{blade_y:.1f}") % 100) / 100.0 - 0.5)
+                * (((hash(f"{blade_x:.1f}_{blade_y:.1f}") % 100) / 100.0) - 0.5)
                 * 2.0
             )
+            
+            # Clamp the blade sway so the tip stays within horizontal boundaries relative to the clamped root
+            max_sway_left = base_x  # maximum left offset from the clamped root
+            max_sway_right = self.width - base_x  # maximum right offset from the clamped root
+            adjusted_sway = max(-max_sway_left, min(blade_sway, max_sway_right))
 
-            # Each blade is a line with a slight angle varying by state
-            vertices.extend([blade_x, blade_y, blade_x + blade_sway, blade_y + height])
+            # Adjust blade height to ensure the tip does not exceed vertical boundary
+            adjusted_height = min(height, self.height - base_y)
+
+            # Each blade is a line from its clamped root to the tip with adjusted sway and height
+            vertices.extend([base_x, base_y, base_x + adjusted_sway, base_y + adjusted_height])
 
             # Slightly randomize green shade for visual interest
             # Make the green slightly brighter in middle animation states for subtle effect
             green_factor = 1.0
             if len(self.states) > 1:
-                # Subtle brightness variation based on animation state
                 mid_state = len(self.states) // 2
                 distance_from_mid = abs(state - mid_state)
                 green_factor = 1.0 - (distance_from_mid / (len(self.states) * 2))
-                green_factor = 0.9 + (
-                    green_factor * 0.2
-                )  # Limit the effect (0.9-1.1 range)
 
-            green = min(255, int(204 * green_factor))
+            green = min(255, int(204 * (0.9 + green_factor * 0.2)))
             blade_color = (0, green, 0)
 
-            # Add color for each vertex in the line
-            colors.extend(blade_color * 2)  # 2 vertices per line
+            # Add color for each vertex in the line (2 vertices per blade)
+            colors.extend(blade_color * 2)
 
         return {"vertices": vertices, "colors": colors}
 
