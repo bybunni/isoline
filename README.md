@@ -5,10 +5,16 @@ Isoline is a retro-inspired isometric game engine that renders all graphics usin
 ## Features
 
 - **Isometric Rendering**: Implements proper isometric projection with the optimal 2:1 tile ratio
-- **Vector Graphics**: All game elements are drawn using vector primitives rather than sprites
+- **Vector Graphics**: All game elements are drawn using vector primitives (lines) rather than sprites, via `pyglet.shapes`
+- **Tile Animation**: Supports multi-state tile animations (e.g., swaying grass)
 - **Custom Map Format**: Supports the MDMap format (.mdmap) for defining multi-layered isometric levels
 - **Green Monochrome Aesthetic**: Captures the look and feel of vintage monochrome displays
 - **Layer System**: Supports multiple map layers (terrain, units, items, etc.)
+- **Performance Optimizations**: Utilizes efficient rendering techniques:
+    - **Batch Rendering**: Groups draw calls using `pyglet.graphics.Batch`
+    - **Vertex Caching**: Caches vertex data per tile state
+    - **View Frustum Culling**: Only renders tiles potentially visible on screen
+    - **Incremental Updates**: Rebuilds only necessary parts of the batch when changes occur (e.g., animation, minor camera movement)
 
 ## Installation
 
@@ -80,25 +86,30 @@ Layers:
 
 [legend: terrain]
 G = Grass
-W = Water
-M = Mountain
+# Example legend - add other tile types here
+# W = Water
+# M = Mountain
 
 [layer: terrain]
+~~~~~~~~\
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
 ~~~~~~~~
-GGGGGGGGGG
-GGGGGGGGGG
-GGMMMMMGGG
-GGMMMMMGGG
-GGMMMMMGGG
-GGGWWWGGGG
-GGGWWWGGGG
-GGGGGGGGGG
-GGGGGGGGGG
-GGGGGGGGGG
-~~~~~~~~
+
+# Add other layers below, matching the 'Layers' list
+# [layer: collision]
+# ...
 ```
 
-See `isoline/grass.mdmap` for a simple example.
+See `maps/small_grass.mdmap` for a simple example.
 
 ## Architecture
 
@@ -111,18 +122,21 @@ Isoline follows a modular architecture with clear separation of concerns:
    - Creates structured representation of maps with layers, legends, and grid data
 
 2. **Tile Renderer (`tile_renderer.py`)**
-   - Defines the base `VectorTile` class and specialized tile types
-   - Implements vector-based drawing for each tile type
-   - Uses Pyglet's shapes module for efficient vector rendering
+   - Defines the base `VectorTile` class and specialized tile types (e.g., `GrassTile`)
+   - Implements vector-based drawing for each tile type using `pyglet.shapes` (primarily `shapes.Line`)
+   - Supports multiple animation states per tile
+   - Caches generated vertex data per animation state for efficiency
 
 3. **Isometric Renderer (`renderer.py`)**
    - Manages the rendering of complete isometric maps
    - Handles layer ordering and composition
-   - Implements isometric projection formulas
-   - Manages tile caching for performance
+   - Implements isometric projection formulas to place tiles
+   - Manages tile instance caching and state
+   - Coordinates tile animations based on timing
+   - Optimizes rendering via view frustum culling and incremental batch updates (`dirty_tiles` system)
 
 4. **Main Application (`main.py`)**
-   - Creates the application window and handles user input
+   - Creates the application window and handles user input (keyboard controls)
    - Coordinates between the renderer and user interaction
    - Manages application lifecycle
 
@@ -150,7 +164,6 @@ Where:
 ## Future Plans
 
 - Additional tile types (water, mountain, roads, etc.)
-- Animation support for dynamic elements
 - Pathfinding for units
 - Advanced lighting effects
 - Editable map interface

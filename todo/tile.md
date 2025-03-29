@@ -1,12 +1,4 @@
-# Issues
+# Animation
 
-FPS is very low, ~4 fps.
-
-## todo
-- [ ] setup debugger
-- [ ] ensure we're using the cache
-- [ ] can we vectorize the `draw` method
-```python
-        # draw content shapes
-        for shape in self.content_shapes:
-```
+- [ ] offset the starting frame for different tiles
+- [ ] can we draw the Grass tile only once, and then just offset the vertices?
