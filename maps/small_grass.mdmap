@@ -1,0 +1,16 @@
+# Level: Grass Test
+Size: 2x2
+Layers:
+  - terrain
+
+[legend: terrain]
+G = Grass
+M = Mountain
+W = Water
+B = Bridge
+
+[layer: terrain]
+~~~~~~~~
+GG
+GG
+~~~~~~~~ 

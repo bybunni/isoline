@@ -24,7 +24,7 @@ class VectorTile:
         self.height = height
 
         # Default colors
-        self.outline_color = (0, 51, 0)  # Dark green
+        self.outline_color = (0, 102, 0)  # Brighter green outline
         self.content_color = (0, 204, 0)  # Bright green
 
         # Create outline points
@@ -166,45 +166,87 @@ class VectorTile:
         # Store the created shapes
         shape_objects = []
 
-        # Process outline points - create Line objects for each segment
-        for i in range(len(self.outline_points) - 1):
-            x1, y1 = self.outline_points[i]
-            x2, y2 = self.outline_points[i + 1]
+        # Calculate the vertices of the isometric diamond
+        top_vx, top_vy = x, y
+        left_vx = x - self.width / 2
+        left_vy = y - self.height / 2
+        right_vx = x + self.width / 2
+        right_vy = y - self.height / 2
+        bottom_vx = x
+        bottom_vy = y - self.height
+
+        # Define the points for the outline lines
+        outline_points = [
+            (top_vx, top_vy),
+            (right_vx, right_vy),
+            (right_vx, right_vy),
+            (bottom_vx, bottom_vy),
+            (bottom_vx, bottom_vy),
+            (left_vx, left_vy),
+            (left_vx, left_vy),
+            (top_vx, top_vy),
+        ]
+
+        # Draw the outline using individual lines connecting the vertices
+        for i in range(0, len(outline_points), 2):
+            x1, y1 = outline_points[i]
+            x2, y2 = outline_points[i + 1]
             line = shapes.Line(
-                x1 + x, y1 + y, x2 + x, y2 + y, color=self.outline_color, batch=batch
+                x1, y1, x2, y2, thickness=1.0, color=self.outline_color, batch=batch
             )
             shape_objects.append(line)
 
+        # Calculate the bottom-left corner of the bounding box *only* for content placement
+        bottom_left_x = x - self.width / 2
+        bottom_left_y = y - self.height
+
         # Process content vertices - create Line objects for content vertex data
         if vertex_data["content_vertices"]:
-            content_vertices = []
+            # Prepare list to store absolute screen coordinates for content vertices
+            content_screen_coords = []
             content_colors = vertex_data["content_colors"]
 
-            # Extract and transform content vertices
+            # Extract and transform content vertices to absolute screen coordinates
             for i in range(0, len(vertex_data["content_vertices"]), 2):
-                vx = vertex_data["content_vertices"][i] + x
-                vy = vertex_data["content_vertices"][i + 1] + y
-                content_vertices.append((vx, vy))
+                vx_local = vertex_data["content_vertices"][i]
+                vy_local = vertex_data["content_vertices"][i + 1]
+                # Offset local vertex by the calculated screen bottom-left corner
+                vx_screen = vx_local + bottom_left_x
+                vy_screen = vy_local + bottom_left_y
+                content_screen_coords.append((vx_screen, vy_screen))
 
-            # Create Line objects for content
-            for i in range(0, len(content_vertices) - 1, 2):
-                if i + 1 < len(content_vertices):  # Ensure we have a pair of points
-                    x1, y1 = content_vertices[i]
-                    x2, y2 = content_vertices[i + 1]
+            # Create Line objects for content using absolute screen coordinates
+            # Assuming content vertices are defined as pairs forming lines
+            for i in range(0, len(content_screen_coords) - 1, 2):
+                if i + 1 < len(
+                    content_screen_coords
+                ):  # Ensure we have a pair of points
+                    x1_screen, y1_screen = content_screen_coords[i]
+                    x2_screen, y2_screen = content_screen_coords[i + 1]
 
                     # Get the color for this line - use content_color if color data not available
                     color = self.content_color
-                    if i // 2 * 3 + 2 < len(content_colors):
+                    # Ensure color indexing matches vertex pair indexing
+                    color_index = (i // 2) * 3  # Base index for RGB color tuple
+                    if color_index + 2 < len(content_colors):
                         color = (
-                            content_colors[i // 2 * 3],
-                            content_colors[i // 2 * 3 + 1],
-                            content_colors[i // 2 * 3 + 2],
+                            content_colors[color_index],
+                            content_colors[color_index + 1],
+                            content_colors[color_index + 2],
                         )
 
-                    line = shapes.Line(x1, y1, x2, y2, color=color, batch=batch)
+                    line = shapes.Line(
+                        x1_screen,
+                        y1_screen,
+                        x2_screen,
+                        y2_screen,
+                        color=color,
+                        batch=batch,
+                    )
                     shape_objects.append(line)
 
         # Store the shapes in the shapes_by_position dict for later cleanup
+        # Use the original top-vertex coordinates (x, y) as the key, as this is what the renderer uses
         pos_key = (x, y)
         self.shapes_by_position[pos_key] = shape_objects
 
