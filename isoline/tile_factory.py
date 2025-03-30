@@ -6,8 +6,8 @@ Factory function for creating different tile types.
 
 from typing import Optional
 from isoline.vector_tile import VectorTile
-from isoline.grass_tile import GrassTile
-from isoline.water_tile import WaterTile
+from isoline.tiles.grass import GrassTile
+from isoline.tiles.water import WaterTile
 
 
 def create_tile(tile_type: str, width: int = 100, height: int = 50) -> VectorTile:
