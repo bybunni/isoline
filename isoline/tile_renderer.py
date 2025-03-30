@@ -24,7 +24,7 @@ class VectorTile:
         self.height = height
 
         # Default colors
-        self.outline_color = (255, 102, 0)  # Tron Orange outline
+        self.outline_color = (139, 69, 19)  # Brown outline
         self.content_color = (0, 204, 0)  # Bright green
 
         # Create outline points
