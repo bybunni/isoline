@@ -56,8 +56,34 @@ class IsolineApp(pyglet.window.Window):
         self.fps_display.label.font_size = 14
 
     def center_map(self):
-        """Center the map in the window"""
-        self.renderer.set_offset(self.width // 2, self.height // 2)
+        """Center the map in the window based on map dimensions"""
+        if not self.renderer.map_data or not self.renderer.map_data.header:
+            # If no map loaded, just center on the window
+            self.renderer.set_offset(self.width // 2, self.height // 2)
+            return
+            
+        # Get map dimensions
+        map_width = self.renderer.map_data.header.width
+        map_height = self.renderer.map_data.header.height
+        tile_w = self.renderer.tile_width
+        tile_h = self.renderer.tile_height
+        
+        # Calculate the visual center of the map in isometric coordinates
+        # For a map of size WxH, we need to consider both the diamond shape and the projection
+        # First, calculate the position for the top-left corner of the map (0,0)
+        map_half_width = map_width // 2
+        map_half_height = map_height // 2
+        
+        # In isometric view, the visual center needs to account for diamond shape
+        # We need to find a point that's in the middle of the diamond, not the rectangle
+        iso_offset_x = (map_half_width - map_half_height) * (tile_w // 2)
+        iso_offset_y = (map_half_width + map_half_height) * (tile_h // 2) // 2
+        
+        # Position this point at the center of the window
+        center_x = self.width // 2 - iso_offset_x
+        center_y = self.height // 2 - iso_offset_y
+        
+        self.renderer.set_offset(center_x, center_y)
 
     def load_map(self, map_path):
         """Load a map file"""
