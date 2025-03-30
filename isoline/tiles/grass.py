@@ -22,7 +22,7 @@ class GrassTile(VectorTile):
         self,
         width: int = 100,
         height: int = 50,
-        num_blades: int = 30,
+        num_blades: int = 15,
         num_states: int = 5,
     ):
         self.num_blades = num_blades
