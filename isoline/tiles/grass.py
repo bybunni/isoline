@@ -38,6 +38,9 @@ class GrassTile(VectorTile):
 
         # Call parent constructor
         super().__init__(width, height)
+        
+        # Set a faint green outline color
+        self.outline_color = (34, 85, 34)  # Muted dark green outline
 
         # Set up animation states
         self.set_states(num_states)

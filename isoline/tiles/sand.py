@@ -21,7 +21,7 @@ class SandTile(VectorTile):
         self,
         width: int = 100,
         height: int = 50,
-        num_grains: int = 25,
+        num_grains: int = 15,
         num_states: int = 1,  # Set to 1 for static (non-animated) tile
     ):
         self.num_grains = num_grains
@@ -38,8 +38,8 @@ class SandTile(VectorTile):
         # Call parent constructor
         super().__init__(width, height)
         
-        # Set sand-specific colors
-        self.outline_color = (194, 178, 128)  # Sandy brown outline
+        # Set sand-specific colors with faint outline
+        self.outline_color = (139, 115, 85)  # Muted sandy brown outline
         self.content_color = (237, 201, 175)  # Desert sand color
         
         # Set to a single state (static, not animated)
