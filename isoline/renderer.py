@@ -12,7 +12,8 @@ from typing import Dict, List, Optional, Tuple, Set, Any
 import math
 
 from isoline.map_parser import MDMap, parse_mdmap
-from isoline.tile_renderer import VectorTile, create_tile
+from isoline.vector_tile import VectorTile
+from isoline.tile_factory import create_tile
 
 
 class IsometricRenderer:
