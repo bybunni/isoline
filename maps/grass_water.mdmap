@@ -1,14 +1,14 @@
 # Level: Grass & Water Map
 Size: 10x10
 Layers:
-  - grass
-  - water
+  - terrain
 
 [legend: terrain]
 G = Grass
 W = Water
 
 [layer: terrain]
+~~~~~~~~
 GGGGGGGGGG
 GGGGGGGGGG
 GGGGGGGGGG
@@ -19,3 +19,4 @@ GGGGGGGGGG
 GGGGGGGGGG
 GGGGGGGGGG
 GGGGGGGGGG
+~~~~~~~~
