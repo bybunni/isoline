@@ -1,0 +1,23 @@
+# Level: River Bank Scene
+Size: 10x10
+Layers:
+  - terrain
+
+[legend: terrain]
+G = Grass
+W = Water
+S = Sand
+
+[layer: terrain]
+~~~~~~~~
+GGGGGGGGGG
+GGGGGGGGGG
+GGGSGGGSGG
+GGWWWWWWGG
+GSWWWWWWSG
+SSWWWWWWSS
+GSWWWWWWSG
+GGSWWWWSGG
+GGGSSSSGGG
+GGGGGGGGGG
+~~~~~~~~
