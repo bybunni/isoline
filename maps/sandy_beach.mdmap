@@ -1,0 +1,23 @@
+# Level: Sandy Beach Scene
+Size: 10x10
+Layers:
+  - terrain
+
+[legend: terrain]
+G = Grass
+W = Water
+S = Sand
+
+[layer: terrain]
+~~~~~~~~
+GGGGGGGGGG
+GGGGGGGGGG
+GGGGGGGGGG
+GGGSSSGGGG
+GSSSSSSSSW
+SSSSSSSWWW
+SSSSSSWWWW
+SSSSSWWWWW
+SSSSWWWWWW
+WWWWWWWWWW
+~~~~~~~~
