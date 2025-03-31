@@ -49,7 +49,8 @@ class WheatFieldTile(VectorTile):
             phase = random.uniform(0, math.pi * 2)
             
             # Sway amplitude - how much the stalk moves
-            sway_factor = random.uniform(0.8, 1.2)
+            # Using a smaller range (0.4-0.8) for more subtle movement
+            sway_factor = random.uniform(0.4, 0.8)
             
             self.stalk_data.append((x, y, height_stalk, lean_angle, head_size, phase, sway_factor))
         
@@ -132,9 +133,10 @@ class WheatFieldTile(VectorTile):
             # Using position-dependent phase creates a rippling effect
             position_phase = (x / self.width) * math.pi * 2
             
-            # Calculate current sway angle
-            # This creates a beautiful wave pattern across the wheat field
-            sway_angle = lean_angle + sway_factor * wave_factor * math.sin(position_phase + phase)
+            # Calculate current sway angle with reduced amplitude
+            # Limit the maximum sway to make it more realistic
+            # Use a much smaller multiplier (0.15 instead of 1.0) to reduce the sway angle
+            sway_angle = lean_angle + sway_factor * 0.15 * wave_factor * math.sin(position_phase + phase)
             
             # Calculate top of stalk position with sway
             stalk_top_x = x + math.sin(sway_angle) * height_stalk
