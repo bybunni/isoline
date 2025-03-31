@@ -1,0 +1,22 @@
+# Level: Lava Test
+Size: 7x7
+Layers:
+  - terrain
+
+[legend: terrain]
+G = Grass
+S = Sand
+W = Water
+P = Pyramid
+L = Lava
+
+[layer: terrain]
+~~~~~~~~
+SSSSSSS
+SLLLLLS
+SLPPPLS
+SLPLPLS
+SLPPPLS
+SLLLLLS
+SSSSSSS
+~~~~~~~~
