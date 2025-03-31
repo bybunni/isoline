@@ -1,0 +1,23 @@
+# Level: Winter Wonderland
+Size: 7x7
+Layers:
+  - terrain
+
+[legend: terrain]
+G = Grass
+S = Sand
+W = Water
+P = Pyramid
+L = Lava
+N = Snow
+
+[layer: terrain]
+~~~~~~~~
+NNNNNNN
+NPPNPPN
+NNNWNNN
+NWNNNNW
+NNNWNNN
+NPPNPPN
+NNNNNNN
+~~~~~~~~
