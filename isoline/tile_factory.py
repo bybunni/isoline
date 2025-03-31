@@ -12,6 +12,7 @@ from isoline.tiles.sand import SandTile
 from isoline.tiles.pyramid import PyramidTile
 from isoline.tiles.lava import LavaTile
 from isoline.tiles.snow import SnowTile
+from isoline.tiles.forest import ForestTile
 
 
 def create_tile(tile_type: str, width: int = 100, height: int = 50) -> VectorTile:
@@ -28,5 +29,7 @@ def create_tile(tile_type: str, width: int = 100, height: int = 50) -> VectorTil
         return LavaTile(width, height, num_states=5)
     elif tile_type in ["N", "n"]:  # Snow (support both upper and lowercase)
         return SnowTile(width, height, num_states=5)
+    elif tile_type in ["F", "f"]:  # Forest (support both upper and lowercase)
+        return ForestTile(width, height, num_states=5)
     else:
         raise ValueError(f"Unknown tile type: {tile_type}")
