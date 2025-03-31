@@ -1,0 +1,19 @@
+# Level: Pyramid Test
+Size: 5x5
+Layers:
+  - terrain
+
+[legend: terrain]
+G = Grass
+S = Sand
+W = Water
+P = Pyramid
+
+[layer: terrain]
+~~~~~~~~
+SSSSS
+SPSPS
+SWPWS
+SPSPS
+SSSSS
+~~~~~~~~
