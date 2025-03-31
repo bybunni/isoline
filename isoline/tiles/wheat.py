@@ -21,7 +21,7 @@ class WheatFieldTile(VectorTile):
         self,
         width: int = 100,
         height: int = 50,
-        num_stalks: int = 20,
+        num_stalks: int = 30,
         num_states: int = 5,
     ):
         # Call parent constructor
