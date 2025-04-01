@@ -1,0 +1,28 @@
+# Level: Warehouse District
+Size: 9x9
+Layers:
+  - terrain
+
+[legend: terrain]
+G = Grass
+S = Sand
+W = Water
+P = Pyramid
+L = Lava
+N = Snow
+F = Forest
+H = Wheat
+B = Box Stack
+
+[layer: terrain]
+~~~~~~~~
+GGGGGGGGW
+GBBBBBBGW
+GBBSSBSGW
+GBBSSBSGW
+GHHGGHGGW
+GHHGGHGGW
+GHHGGHGGW
+GFFFFFFGW
+WWWWWWWWW
+~~~~~~~~

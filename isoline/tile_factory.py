@@ -14,6 +14,7 @@ from isoline.tiles.lava import LavaTile
 from isoline.tiles.snow import SnowTile
 from isoline.tiles.forest import ForestTile
 from isoline.tiles.wheat import WheatFieldTile
+from isoline.tiles.boxstack import BoxStackTile
 
 
 def create_tile(tile_type: str, width: int = 100, height: int = 50) -> VectorTile:
@@ -34,5 +35,7 @@ def create_tile(tile_type: str, width: int = 100, height: int = 50) -> VectorTil
         return ForestTile(width, height, num_states=5)
     elif tile_type in ["H", "h"]:  # Wheat Field (support both upper and lowercase)
         return WheatFieldTile(width, height, num_states=5)
+    elif tile_type in ["B", "b"]:  # Box Stack (support both upper and lowercase)
+        return BoxStackTile(width, height, num_states=3)
     else:
         raise ValueError(f"Unknown tile type: {tile_type}")
